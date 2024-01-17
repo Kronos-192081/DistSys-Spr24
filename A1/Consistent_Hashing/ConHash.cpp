@@ -90,6 +90,7 @@ class ConHash{
             }
             hash_d[hash] = {true, name};
         }
+
         return 1;
     }
 
@@ -110,6 +111,7 @@ class ConHash{
         if(len == 0) return "No Server Allocable";
         int hash = get_cli_hash(id);
         // cout << id << " : " << hash << endl;
+        hash = (hash + 1)%size;
         while(!hash_d[hash].occ)
         {
             hash = (hash + 1)%size;
