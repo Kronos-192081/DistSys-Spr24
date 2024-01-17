@@ -24,7 +24,7 @@ func main() {
 	})
 
 	e.GET("/heartbeat", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]interface{}{})
+		return c.NoContent(http.StatusOK)
 	})
 
 	httpPort := os.Getenv("PORT")

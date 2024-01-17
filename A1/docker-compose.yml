@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  lb:
+    build: ./lb
+    image: lb
+  #   container_name: lb
+  #   # hostname: lb01
+    ports:
+      - 5000:5000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+    networks:
+      net1:
+
+  # server:
+  #   depends_on:
+  #     - lb
+    # build: ./server
+    # image: server
+    # container_name: server
+    # ports:
+    #   - 5000:5000
+    # networks:
+    #   net1:
+    # environment:
+    #   - SERVER_NUMBER=69
+
+networks:
+  net1:
+    # name: net1
