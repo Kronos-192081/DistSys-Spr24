@@ -16,9 +16,10 @@ func main() {
 	e.Use(middleware.Recover())
 
 	e.GET("/home", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string {
-			"message": "Hello!",
-			"status": "successful",
+		serverNumber := os.Getenv("SERVER_NUMBER")
+		return c.JSON(http.StatusOK, map[string]string{
+			"message": "Hello from Server: " + serverNumber,
+			"status":  "successful",
 		})
 	})
 
