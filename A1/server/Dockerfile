@@ -1,14 +1,9 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:latest
-
+FROM golang:latest AS build
 # LABEL maintainer "Kartik Pontula"
 
-# Expose PORT
-EXPOSE 5000
-
-# Set destination for COPY
-WORKDIR /app
+WORKDIR /server
 
 # Download Go modules
 COPY go.mod go.sum ./
@@ -20,5 +15,14 @@ COPY *.go ./
 # Build
 RUN CGO_ENABLED=0 GOOS=linux go build -o /docker-server
 
+FROM scratch AS deploy
+
+WORKDIR /server
+
+COPY --from=build /docker-server /docker-server
+
+# Expose PORT
+EXPOSE 5000
+
 # Run
-CMD ["/docker-server"]
+ENTRYPOINT ["/docker-server"]

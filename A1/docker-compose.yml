@@ -4,13 +4,13 @@ services:
   lb:
     build: ./lb
     image: lb
-  #   container_name: lb
-  #   # hostname: lb01
+    container_name: lb
+    # hostname: lb
     ports:
       - 5000:5000
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    privileged: true
+    # privileged: true
     networks:
       net1:
 
@@ -25,7 +25,7 @@ services:
     # networks:
     #   net1:
     # environment:
-    #   - SERVER_NUMBER=69
+    #   - SERVER_NUMBER=1
 
 networks:
   net1:
