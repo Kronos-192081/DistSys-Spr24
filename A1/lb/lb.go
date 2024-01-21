@@ -12,7 +12,9 @@ import (
 	"time"
 	"errors"
 	"prakhar/conhash"
-	// "github.com/fsouza/go-dockerclient"
+	"strings"
+	"strconv"
+	"github.com/fsouza/go-dockerclient"
 )
 
 const Mod = 1e4 + 7
@@ -24,13 +26,18 @@ func main() {
 
 	rand.NewSource(time.Now().UnixNano())
 
-	// To be removed
 	ids := []int{rand.Intn(Mod), rand.Intn(Mod), rand.Intn(Mod)}
-	servNames := []string{"Server 1", "Server 2", "Server 3"}
+	servNames := []string{"Server_1", "Server_2", "Server_3"}
 	c.Add(ids, servNames)
-	servNamePort["Server 1"] = "5001"
-	servNamePort["Server 2"] = "5002"
-	servNamePort["Server 3"] = "5003"
+	addServerContainer("Server_1", ids[0])
+	addServerContainer("Server_2", ids[1])
+	addServerContainer("Server_3", ids[2])
+
+	listServerContainers()
+
+	fmt.Println(killServerContainer("Server_3"))
+
+	listServerContainers()
 
 	http.HandleFunc("/rep", rep)
 	repSrv := &http.Server{Addr: "127.0.0.1:5000"}
@@ -316,8 +323,7 @@ func serverHeartbeat() (string, error) {
 	max_tries := 10000
 	for max_tries != 0 {
 		servName := GetServerName()
-		servPort := servNamePort[servName]	// needs modification
-		url := "http://127.0.0.1:" + servPort	// needs modification
+		url := "http://" + servName + ":5000"
 		servResp, err := http.Get(url + "/heartbeat")
 		if err == nil && servResp.StatusCode == http.StatusOK {
 			return url, nil
@@ -387,4 +393,83 @@ func path(rw http.ResponseWriter, req *http.Request) {
 	default:
 		rw.WriteHeader(http.StatusNotFound)
 	}
+}
+
+func listServerContainers() error {
+
+    endpoint := "unix:///var/run/docker.sock"
+    client, err := docker.NewClient(endpoint)
+    if err != nil {
+        return err
+    }
+
+    containers, err := client.ListContainers(docker.ListContainersOptions{All: false})
+    if err != nil {
+        return err
+    }
+	hostnames := []string{}
+    // currentHostname, err := os.Hostname()
+    // if err != nil {
+    //     return err
+    // }
+	// TODO: remove lb from list
+    for _, container := range containers {
+		for _, name := range container.Names {
+			cleanName := strings.TrimPrefix(name, "/")
+            // if cleanName != currentHostname {
+			hostnames = append(hostnames, cleanName)
+            // }
+		} 
+    }
+	fmt.Println("Hostnames: ", hostnames)
+	return nil
+}
+
+func addServerContainer(serverName string, serverNumber int) error {
+
+	endpoint := "unix:///var/run/docker.sock"
+    client, err := docker.NewClient(endpoint)
+    if err != nil {
+        return err
+    }
+
+	createContainerOptions := docker.CreateContainerOptions{
+        Name: serverName,
+        Config: &docker.Config{
+            Image: "alutnopk/go-http-server",
+            Env: []string{"SERVER_NUMBER=" + strconv.Itoa(serverNumber)},
+        },
+        HostConfig: &docker.HostConfig{
+            AutoRemove: true,
+            // Tty:        true,
+            // OpenStdin:  true,
+            NetworkMode: "net1",
+        },
+    }
+    container, err := client.CreateContainer(createContainerOptions)
+    if err != nil {
+        return err
+    }
+
+    err = client.StartContainer(container.ID, nil)
+    if err != nil {
+        return err
+    }
+	return nil
+}
+
+func killServerContainer(serverName string) error {
+
+	endpoint := "unix:///var/run/docker.sock"
+    client, err := docker.NewClient(endpoint)
+    if err != nil {
+        return err
+    }
+
+	killOptions := docker.KillContainerOptions{ID: serverName}
+    err = client.KillContainer(killOptions)
+    if err != nil {
+        return err
+    }
+    return nil
 }

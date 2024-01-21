@@ -29,4 +29,4 @@ services:
 
 networks:
   net1:
-    # name: net1
+    name: net1
