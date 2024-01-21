@@ -83,10 +83,12 @@ func (c *ConHash) GetConfig() {
 // AddServer adds a single server to the consistent hash ring.
 func (c *ConHash) AddServer(id int, Name string) int {
 	if _, ok := c.AllServers[Name]; ok {
+		fmt.Println("Same server name already exists")
 		return 0
 	}
 
 	if (c.Nserv+1)*c.VirtServ >= c.Size {
+		fmt.Println("Size limit exceeded")
 		return 0
 	}
 
@@ -116,6 +118,7 @@ func (c *ConHash) RemoveServer(Name string) int {
 		}
 	}
 	delete(c.AllServers, Name)
+	c.Nserv--
 	return 1
 }
 
@@ -125,6 +128,7 @@ func (c *ConHash) GetServer(id int) string {
 		return "No Server Allocable"
 	}
 	hash := c.getCliHash(id)
+	fmt.Println("hash for ", id, " --> ", hash)
 	hash = (hash + 1) % c.Size
 	for !c.HashD[hash].Occ {
 		hash = (hash + 1) % c.Size

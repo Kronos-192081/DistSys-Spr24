@@ -13,11 +13,11 @@ RUN go mod download
 # Build
 RUN CGO_ENABLED=0 GOOS=linux go build -o /docker-lb
 
-# FROM scratch AS deploy
+FROM scratch AS deploy
 
-# WORKDIR /lb
+WORKDIR /lb
 
-# COPY --from=build /docker-lb /docker-lb
+COPY --from=build /docker-lb /docker-lb
 
 # Expose PORT
 EXPOSE 5000
