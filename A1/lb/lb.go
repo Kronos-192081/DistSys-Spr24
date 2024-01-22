@@ -24,6 +24,17 @@ var mtx sync.Mutex
 
 func main() {
 	fmt.Println("Starting load balancer")
+	// pulling server image
+	endpoint := "unix:///var/run/docker.sock"
+	client, err := docker.NewClient(endpoint)
+	if err != nil{
+		fmt.Println("Client creation failed", err)
+	}
+
+	err = pullImage(client, "alutnopk/go-http-server:latest")
+	if err != nil {
+		fmt.Println("Could not Pull Image", err)
+	}
 
 	rand.NewSource(time.Now().UnixNano())
 
@@ -115,17 +126,20 @@ type Response struct {
 
 // Utility functions
 
-func GenerateRandomString(length int) string {
-	rand.NewSource(time.Now().UnixNano())
+func GenerateRandomString(num int) string {
 
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	result := make([]byte, length)
+	// rand.NewSource(time.Now().UnixNano())
 
-	for i := 0; i < length; i++ {
-		result[i] = charset[rand.Intn(len(charset))]
-	}
+	// const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	// result := make([]byte, length)
 
-	return string(result)
+	// for i := 0; i < length; i++ {
+	// 	result[i] = charset[rand.Intn(len(charset))]
+	// }
+
+	name := "spawned_server_"+strconv.Itoa(num)
+
+	return name
 }
 
 // Fisher-Yates algorithm for random permutation
@@ -195,7 +209,8 @@ func add(rw http.ResponseWriter, req *http.Request) {
 		if payloadData.N >= len(payloadData.Hostnames) {
 			extraServ := payloadData.N - len(payloadData.Hostnames)
 			for i := 0; i < extraServ; i++ {
-				err := addServerContainer(GenerateRandomString(10), rand.Intn(Mod))
+				num := rand.Intn(Mod)
+				err := addServerContainer(GenerateRandomString(num), num)
 				if err != nil {
 					fmt.Println("Error:", err)
 					rw.WriteHeader(http.StatusInternalServerError)
@@ -348,7 +363,8 @@ func serverHeartbeat() (string, error) {
 			mtx.Unlock()
 			return "", errors.New("Inactive server deletion failed")
 		}
-		err = addServerContainer(GenerateRandomString(10), rand.Intn(Mod))
+		num := rand.Intn(Mod)
+		err = addServerContainer(GenerateRandomString(num), num)
 		if err != nil {
 			mtx.Unlock()
 			return "", errors.New("New server creation failed")
@@ -473,12 +489,14 @@ func addServerContainer(serverName string, serverNumber int) error {
     }
     container, err := client.CreateContainer(createContainerOptions)
     if err != nil {
+		fmt.Println("Container could not be created\n", err)
 		c.RemoveServer(serverName)
         return err
     }
 
     err = client.StartContainer(container.ID, nil)
     if err != nil {
+		fmt.Println("Container could not be started\n", err)
 		c.RemoveServer(serverName)
         return err
     }
@@ -506,5 +524,20 @@ func killServerContainer(serverName string) error {
 		return errors.New("Server not found")
 	}
 	time.Sleep(1*time.Second)
+    return nil
+}
+
+func pullImage(client *docker.Client, imageName string) error {
+	fmt.Println("Pulling image", imageName)
+    pullOptions := docker.PullImageOptions{
+        Repository: imageName,
+    }
+    authConfiguration := docker.AuthConfiguration{}
+    err := client.PullImage(pullOptions, authConfiguration)
+    if err != nil {
+		fmt.Println("Could not pull image from Docker Hub\n")
+        return err
+    }
+	fmt.Println("Image pulled\n")
     return nil
 }
