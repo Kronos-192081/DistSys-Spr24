@@ -19,9 +19,9 @@
 </div>
 
 
-## About The Project
+# About The Project
 
-This project is a customisable load balancer.
+This project is an implementation of a customizable dynamic load balancer in Go that utilizes consistent hashing. The problem statement can be viewed [here](./DS_assign1_LB_2024.pdf).
 
 Team Members:
 - Kartik Pontula (20CS10031)
@@ -33,14 +33,160 @@ Team Members:
 
 
 
-<!-- GETTING STARTED -->
-## Getting Started
+<!-- INSTALLATION -->
+# Getting Started
+## Requirements:
+- **OS**: Ubuntu 20.04 LTS or later
+- **Docker**: Version 20.10.23 or later
 
-..............
+## Installation
 
-..............
+### 1. **Clone the repository and navigate to the A1 directory.**
+```sh
+git clone https://github.com/Kronos-192081/DistSys-Spr24.git && cd A1
+```
+### 2. **Build the Docker images for the load balancer and servers.**
+```sh
+make build
+```
+This requires an active internet connection. The generated images can be viewed with `docker images`:
+```sh
+REPOSITORY                 TAG       IMAGE ID       CREATED          SIZE
+lb                         latest    d62b10df29ff   17 minutes ago   10.9MB
+server                     latest    b2c8134fdacd   4 hours ago      7.86MB
+```
+### 3. **Start the load balancer system.**
+```sh
+make run
+```
+The load balancer shall now be listening on http://localhost:5000/ with 3 servers in the same Docker bridge network `net1`.
 
-.............
+One may inspect the containers by running `docker ps` which shows:
+
+```sh
+CONTAINER ID   IMAGE     COMMAND            CREATED              STATUS              PORTS                    NAMES
+6d174d73c59e   server    "/docker-server"   About a minute ago   Up About a minute   5000/tcp                 Server_3
+600e45c760cb   server    "/docker-server"   About a minute ago   Up About a minute   5000/tcp                 Server_2
+516f94e95d72   server    "/docker-server"   About a minute ago   Up About a minute   5000/tcp                 Server_1
+ca3c268f4e09   lb        "/docker-lb"       About a minute ago   Up About a minute   0.0.0.0:5000->5000/tcp   lb
+```
+
+### 4. **Interact with the load balancer.**
+
+One may use a browser, `curl` or other methods to send HTTP requests to the /home, /heartbeat, /rep, /add and /rm routes on the load balancer.
+
+#### Examples
+- `/home`
+
+Response:
+
+```HTTP
+HTTP/1.1 200 OK
+Date: Wed, 24 Jan 2024 17:19:14 GMT
+Content-Length: 59
+Content-Type: text/plain; charset=utf-8
+
+{"message":"Hello from Server: 4727","status":"successful"}
+```
+(Here 4727 is a random server ID assigned by the load balancer.)
+
+- `/heartbeat`
+
+Response:
+```HTTP
+HTTP/1.1 200 OK
+Date: Wed, 24 Jan 2024 17:20:29 GMT
+Content-Length: 0
+```
+
+- `/rep`
+
+Request:
+```HTTP
+GET /rep HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+```
+
+Response:
+```HTTP
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 17:35:35 GMT
+Content-Length: 98
+
+{"message":{"N":3,"replicas":["Server_3","Server_2","Server_1"]},"status":"successful"}
+```
+
+- `/add`
+
+Request:
+```HTTP
+POST /add HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+Content-Type: application/json
+Content-Length: 57
+
+{"n":3, "hostnames":["Server_4", "Server_5", "Server_6"]}
+```
+
+Response:
+```HTTP
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 17:25:12 GMT
+Content-Length: 120
+
+{"message":{"N":6,"replicas":["Server_6","Server_5","Server_4","Server_3","Server_2","Server_1"]},"status":"successful"}
+```
+
+- `/rm`
+
+Request:
+```HTTP
+DELETE /rm HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+Content-Type: application/json
+Content-Length: 45
+
+{"n":2, "hostnames":["Server_3", "Server_2"]}
+```
+
+Response:
+```HTTP
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 17:32:42 GMT
+Content-Length: 98
+
+{"message":{"N":4,"replicas":["Server_6","Server_5","Server_4","Server_1"]},"status":"successful"}
+```
+
+### 5. **Perform testing and analysis.**
+
+One may also send 10,000 asynchronous HTTP requests via the script in the [Analysis](./Analysis/) folder by running this:
+
+```sh
+make test
+```
+Server load analysis will be generated in [./Analysis/A1.png](./Analysis/A1.png) and [./Analysis/A2.png](./Analysis/A2.png).
+
+### 6. **Shutdown and cleanup.**
+
+To stop the servers, load balancer and Docker network:
+
+```sh
+make kill
+```
+To remove the images:
+```sh
+make clean
+```
 
 
 # Server Implementation
