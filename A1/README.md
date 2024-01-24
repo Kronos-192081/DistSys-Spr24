@@ -704,8 +704,9 @@ $$
 $$
 \phi(i, j) = i^2 + j^2 + 2j + 25
 $$
+
 ![bar_plot](./images/Hash_F21.png)
-<br />
+
 
 ![line_plot](./images/Hash_F22.png)
 ### Modified Hash function 2:-
@@ -718,7 +719,7 @@ $$
 $$
 
 ![bar_plot](./images/Hash_F31.png)
-<br />
+
 
 ![line_plot](./images/Hash_F32.png)
 
@@ -732,7 +733,7 @@ $$
 $$
 
 ![bar_plot](./images/Hash_F41.png)
-<br />
+
 
 ![line_plot](./images/Hash_42.png)
 
