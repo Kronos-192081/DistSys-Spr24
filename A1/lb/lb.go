@@ -18,34 +18,21 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
+var num_serv , _ = strconv.Atoi(os.Getenv("NUM_SERV"))
+var num_slots, _ = strconv.Atoi(os.Getenv("NUM_SLOTS"))
+var num_virt_serv, _ = strconv.Atoi(os.Getenv("NUM_VIRT_SERV"))
 const Mod = 1e4 + 7
-var c = conhash.NewConHash(512, 9) // Needs change
+var c = conhash.NewConHash(num_slots, num_virt_serv)
 var mtx sync.Mutex
 
 func main() {
 	fmt.Println("Starting load balancer")
-	// pulling server image
-	endpoint := "unix:///var/run/docker.sock"
-	client, err := docker.NewClient(endpoint)
-	if err != nil{
-		fmt.Println("Client creation failed", err)
-	}
-
-	err = pullImage(client, "alutnopk/go-http-server:latest")
-	if err != nil {
-		fmt.Println("Could not Pull Image", err)
-	}
-
+	
 	rand.NewSource(time.Now().UnixNano())
 
-	ids := []int{rand.Intn(Mod), rand.Intn(Mod), rand.Intn(Mod)}
-	servNames := []string{"Server_1", "Server_2", "Server_3"}
-	addServerContainer(servNames[0], ids[0])
-	addServerContainer(servNames[1], ids[1])
-	addServerContainer(servNames[2], ids[2])
-
-	listServerContainers()
-	c.GetConfig()
+	for i := 0; i < num_serv; i++ {
+		addServerContainer("Server_" + strconv.Itoa(i + 1), rand.Intn(Mod))
+	}
 
 	listServerContainers()
 
@@ -124,6 +111,7 @@ type Response struct {
 	Status  string `json:"status"`
 }
 
+
 // Utility functions
 
 func GenerateRandomString(num int) string {
@@ -131,13 +119,13 @@ func GenerateRandomString(num int) string {
 	// rand.NewSource(time.Now().UnixNano())
 
 	// const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	// result := make([]byte, length)
+	// name := make([]byte, length)
 
 	// for i := 0; i < length; i++ {
-	// 	result[i] = charset[rand.Intn(len(charset))]
+	// 	name[i] = charset[rand.Intn(len(charset))]
 	// }
 
-	name := "spawned_server_"+strconv.Itoa(num)
+	name := "spawned_server_" + strconv.Itoa(num)
 
 	return name
 }
@@ -150,6 +138,7 @@ func permuteSlice(slice []string) {
 		slice[i], slice[j] = slice[j], slice[i]
 	}
 }
+
 
 // Handler functions for incoming requests
 
@@ -209,12 +198,19 @@ func add(rw http.ResponseWriter, req *http.Request) {
 		if payloadData.N >= len(payloadData.Hostnames) {
 			extraServ := payloadData.N - len(payloadData.Hostnames)
 			for i := 0; i < extraServ; i++ {
-				num := rand.Intn(Mod)
-				err := addServerContainer(GenerateRandomString(num), num)
-				if err != nil {
-					fmt.Println("Error:", err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					return
+				for {
+					num := rand.Intn(Mod)
+					name := GenerateRandomString(num)
+					if _, ok := c.AllServers[name]; ok {
+						continue
+					}
+					err = addServerContainer(name, num)
+					if err != nil {
+						fmt.Println("Error:", err)
+						rw.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					break
 				}
 			}
 
@@ -363,11 +359,18 @@ func serverHeartbeat() (string, error) {
 			mtx.Unlock()
 			return "", errors.New("Inactive server deletion failed")
 		}
-		num := rand.Intn(Mod)
-		err = addServerContainer(GenerateRandomString(num), num)
-		if err != nil {
-			mtx.Unlock()
-			return "", errors.New("New server creation failed")
+		for {
+			num := rand.Intn(Mod)
+			name := GenerateRandomString(num)
+			if _, ok := c.AllServers[name]; ok {
+				continue
+			}
+			err = addServerContainer(name, num)
+			if err != nil {
+				mtx.Unlock()
+				return "", errors.New("New server creation failed")
+			}
+			break
 		}
 		mtx.Unlock()
 		max_tries--
@@ -441,20 +444,19 @@ func listServerContainers() ([]string, error) {
     if err != nil {
         return []string{}, err
     }
-    // currentHostname, err := os.Hostname()
-    // if err != nil {
-	//     return []string{}, err
-	// }
-	// fmt.Println(currentHostname)
 		
 	hostnames := []string{}
 	for _, container := range containers {
-		for _, name := range container.Names {
-			cleanName := strings.TrimPrefix(name, "/")
-		if cleanName != "lb" {
-			hostnames = append(hostnames, cleanName)
+		for network := range container.NetworkSettings.Networks {
+			if network == "net1" {
+				for _, name := range container.Names {
+					cleanName := strings.TrimPrefix(name, "/")
+					if cleanName != "lb" {
+						hostnames = append(hostnames, cleanName)
+					}
+				} 
 			}
-		} 
+		}
 	}
 	fmt.Println("Hostnames: ", hostnames)
 	return hostnames, nil
@@ -500,7 +502,7 @@ func addServerContainer(serverName string, serverNumber int) error {
 		c.RemoveServer(serverName)
         return err
     }
-	// TODO: figure out callback
+
 	time.Sleep(1*time.Second)
 	return nil
 }
@@ -523,21 +525,7 @@ func killServerContainer(serverName string) error {
 	if res == 0 {
 		return errors.New("Server not found")
 	}
-	time.Sleep(1*time.Second)
-    return nil
-}
 
-func pullImage(client *docker.Client, imageName string) error {
-	fmt.Println("Pulling image", imageName)
-    pullOptions := docker.PullImageOptions{
-        Repository: imageName,
-    }
-    authConfiguration := docker.AuthConfiguration{}
-    err := client.PullImage(pullOptions, authConfiguration)
-    if err != nil {
-		fmt.Println("Could not pull image from Docker Hub\n")
-        return err
-    }
-	fmt.Println("Image pulled\n")
+	time.Sleep(1*time.Second)
     return nil
 }
