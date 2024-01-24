@@ -29,6 +29,7 @@ func NewConHash(m, k int) *ConHash {
 		VirtServ:   k,
 		Nserv:		0,
 		AllServers: make(map[string]int),
+		ServerID: 	make(map[string]int),
 	}
 }
 
