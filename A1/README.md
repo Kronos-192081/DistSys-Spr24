@@ -297,6 +297,108 @@ server := ch.GetServer(123)
 fmt.Println("Allocated Server:", server)
 ```
 
+# Load Balancer Implementation
+
+### Environment Variables
+
+3 environment variables are used, namely, `num_serv` which is the initial number of servers which are to be spawned, `num_slots` which is the number of slots in the conhash, `num_virt_serv` which is the number of virtual servers that are to be maintained for each server.
+
+## Initialization
+
+- `num_serv` number of servers are spawned.
+- `rep` handler for handling GET requests to \rep
+- `add` handler for handling POST requests to \add
+- `rm` handler for handling DELETE requests to \rm
+- `path` handler for handling all other requests out of which only GET requests to \home and \heartbeat are processed
+
+## Data Structures used
+
+### ServDetails
+- It stores the details of servers which are to be sent to the client.
+- Attributes
+  - `N` : Number of servers currently active
+  - `Replicas` : The names of servers currently active
+
+### Payload
+- It stores the details of the request sent by the client for processing.
+- Attributes
+  - `N` : Number of modifications to servers
+  - `Hostnames` : Names of servers that need modification, i.e., addition or removal
+
+### ResponseSuccess
+- It stores the complete response that is to be sent to the client in case of requests involving server details.
+- Attributes
+  - `Message` : The server details (struct ServDetails) that are to be sent to the client.
+  - `Status` : Status of the response for the request sent by the client.
+
+### Response
+- It stores the details of message received during request to server at \home and \heartbeat.
+- Attributes
+  - `Message` : The message from the server that is to be sent to the client.
+  - `Status` : Status of the response for the request sent by the client.
+
+## Utility functions
+
+### GenerateRandomString : num int => string
+- It generates the random server name that is necessary during extra server addition from the `num` that is provided as input.
+
+### permuteSlice : slice []string
+- It permutes the string array of names `slice` randomly using Fisher-Yates algorithm, which is necessary during random extra server deletion.
+
+### GetServerName => string
+- It obtains and returns the server name from a randomly generated id.
+
+### serverHeartbeat => (string, error)
+- It performs heartbeat to a random server on `PORT 5000`.
+- If the server is found to be unavailable, it tries to add a new server in a loop so as to maintain the the count of active servers and also prevent any server name collisions, and removes the inactive server from conhash.
+- If the server is available, it returns the `url` of that server.
+- Max Tries has been set to 10000 so as not to loop infinitely in case of errors.
+
+## Docker API functions
+
+### 1. listServerContainers => ([]string, error)
+- It runs a new Docker client which lists all active docker containers.
+- Only those containers are considered which are present in the docker network `net1`.
+
+### 2. addServerContainer : serverName string, serverNumber int => error
+- It runs a new Docker client which tries to add a new docker container with the given `serverName` and sets the environment variable for the container `SERVER_NUMBER` as the given`serverNumber`.
+- Additionally, it also adds the server to the conhash data structure.
+
+### 3. killServerContainer : serverName string => error
+- It runs a new Docker client which tries to kill the docker container with the given `serverName`.
+- Additionally, it also removes the server from the conhash data structure.
+
+## `rep` handler function
+- Handles only `GET` requests to \rep
+- Uses `listServerContainers()` to get the list of active docker containers.
+- Stores the details in the `ServDetails struct` and packs that within the `ResponseSuccess struct` and sends to the client with a status OK.
+- All other errors are handled as Internal Server errors.
+
+## `add` handler function
+- Handles only `POST` requests to \add
+- Receives the client request in a `Payload struct`
+- Adds the required servers
+- Error in case server is already present
+- Extra servers are added with randomly generated names with name collision prevention
+- Uses `listServerContainers()` to get the list of active docker containers.
+- Stores the details in the `ServDetails struct` and packs that within the `ResponseSuccess struct` and sends to the client with a status OK.
+- All other errors are handled as Internal Server errors.
+
+## `rm` handler function
+- Handles only `DELETE` requests to \rm
+- Receives the client request in a `Payload struct`
+- Removes the required servers
+- Error in case server is absent
+- Extra servers are deleted randomly using the `permuteSlice()` which takes the server name list as input from `listServerContainers()`
+- Uses `listServerContainers()` again to get the list of active docker containers.
+- Stores the details in the `ServDetails struct` and packs that within the `ResponseSuccess struct` and sends to the client with a status OK.
+- All other errors are handled as Internal Server errors.
+
+## `path` handler function
+- Handles only `GET` requests on the path \home and \heartbeat
+- It performs `serverHeartbeat` which returns a successful url.
+- Th response is packed in a `Response struct` with status code OK and sent to the client.
+- All other errors are handled as Internal Server errors.
 
 # Load Balancer Performance Analysis
 
