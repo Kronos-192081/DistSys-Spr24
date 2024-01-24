@@ -209,12 +209,19 @@ func add(rw http.ResponseWriter, req *http.Request) {
 		if payloadData.N >= len(payloadData.Hostnames) {
 			extraServ := payloadData.N - len(payloadData.Hostnames)
 			for i := 0; i < extraServ; i++ {
-				num := rand.Intn(Mod)
-				err := addServerContainer(GenerateRandomString(num), num)
-				if err != nil {
-					fmt.Println("Error:", err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					return
+				for {
+					num := rand.Intn(Mod)
+					name := GenerateRandomString(num)
+					if _, ok := c.AllServers[name]; ok {
+						continue
+					}
+					err = addServerContainer(name, num)
+					if err != nil {
+						fmt.Println("Error:", err)
+						rw.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					break
 				}
 			}
 
@@ -363,11 +370,18 @@ func serverHeartbeat() (string, error) {
 			mtx.Unlock()
 			return "", errors.New("Inactive server deletion failed")
 		}
-		num := rand.Intn(Mod)
-		err = addServerContainer(GenerateRandomString(num), num)
-		if err != nil {
-			mtx.Unlock()
-			return "", errors.New("New server creation failed")
+		for {
+			num := rand.Intn(Mod)
+			name := GenerateRandomString(num)
+			if _, ok := c.AllServers[name]; ok {
+				continue
+			}
+			err = addServerContainer(name, num)
+			if err != nil {
+				mtx.Unlock()
+				return "", errors.New("New server creation failed")
+			}
+			break
 		}
 		mtx.Unlock()
 		max_tries--
@@ -449,12 +463,16 @@ func listServerContainers() ([]string, error) {
 		
 	hostnames := []string{}
 	for _, container := range containers {
-		for _, name := range container.Names {
-			cleanName := strings.TrimPrefix(name, "/")
-		if cleanName != "lb" {
-			hostnames = append(hostnames, cleanName)
+		for network := range container.NetworkSettings.Networks {
+			if network == "net1" {
+				for _, name := range container.Names {
+					cleanName := strings.TrimPrefix(name, "/")
+					if cleanName != "lb" {
+						hostnames = append(hostnames, cleanName)
+					}
+				} 
 			}
-		} 
+		}
 	}
 	fmt.Println("Hostnames: ", hostnames)
 	return hostnames, nil
