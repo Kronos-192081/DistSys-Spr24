@@ -420,7 +420,7 @@ This document presents an analysis of the load balancer's performance based on t
 
 **Overall Metrics:**
 
-- Time taken: 3.5 seconds (average)
+- Time taken: 3 seconds (average)
 - Memory usage: 2.5 GB
 
 **Observations:**
@@ -447,13 +447,17 @@ This document presents an analysis of the load balancer's performance based on t
 
 **Overall Metrics:**
 
-- Time taken: 25.5 seconds (average)
+- Time taken: 20 seconds (average)
 - Memory usage: 2.5 GB
 
-**Observations and Conclusions:**
+**Observations:**
 
-- We can see that the average load follows the function 10000/N. 
-- However, in such case standard deviation tells a lot about the distribution. In this case for N = 5 we get the minimum value which tells that for N = 5, the distribution is almost uniform. 
+- We can see that the average load follows the function $\frac{10000}{N}$. 
+- However, in such case standard deviation tells a lot about the distribution. In this case for $N = 5$ we get the minimum value which tells that for $N = 5$, the distribution is almost uniform. 
+
+**Conclusions:**
+
+ - From the line chart we can infer that on increasing the number of servers the uniformity of the distribution improves.
 
 ---
 
@@ -710,7 +714,7 @@ H(i) = i^2 + 7i + 31
 $$
 
 $$
-\phi(i, j) = i^2 + j^2 + (i \& j) + ((i>>4) \oplus (j >> 3))
+\phi(i, j) = i^2 + j^2 + i + j - (i | j) + ((i>>4) \oplus (j >> 3))
 $$
 
 ![bar_plot](./images/Hash_F31.png)
@@ -757,12 +761,3 @@ Run ``make monitor`` to use it in ``http://localhost:8080``.
 
 #### Network
 ![lb3](./images/cadvisor/lb-network.png)
-
-## Contributors:
-- Kartik Pontula (20CS10031)
-- Prakhar Singh (20CS10045)
-- Shiladitya De (20CS30061)
-- Sourabh Soumyakanta Das (20CS30051)
-
-
-
