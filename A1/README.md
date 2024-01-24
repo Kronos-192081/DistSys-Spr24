@@ -73,99 +73,32 @@ ca3c268f4e09   lb        "/docker-lb"       About a minute ago   Up About a minu
 
 ### 4. **Interact with the load balancer.**
 
-One may use a browser, `curl` or other methods to send HTTP requests to the /home, /heartbeat, /rep, /add and /rm routes on the load balancer.
+One may use a browser, `curl` or other methods to send HTTP requests to the `/home`, `/heartbeat`, `/rep`, `/add` and `/rm` routes on the load balancer as elaborated upon in the problem statement.
 
-#### Examples
-- `/home`
+#### An Example
 
-Response:
-
-```HTTP
-HTTP/1.1 200 OK
-Date: Wed, 24 Jan 2024 17:19:14 GMT
-Content-Length: 59
-Content-Type: text/plain; charset=utf-8
-
+```sh
+$ curl -vv -X GET http://localhost:5000/home
+Note: Unnecessary use of -X or --request, GET is already inferred.
+*   Trying 127.0.0.1:5000...
+* Connected to localhost (127.0.0.1) port 5000 (#0)
+> GET /home HTTP/1.1
+> Host: localhost:5000
+> User-Agent: curl/7.81.0
+> Accept: */*
+> 
+* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< Date: Wed, 24 Jan 2024 17:19:14 GMT
+< Content-Length: 59
+< Content-Type: text/plain; charset=utf-8
+< 
+* Connection #0 to host localhost left intact
 {"message":"Hello from Server: 4727","status":"successful"}
 ```
-(Here 4727 is a random server ID assigned by the load balancer.)
+More elaborate tests can be found in the [Load Balancer Performance Analysis](#load-balancer-performance-analysis) section.
 
-- `/heartbeat`
 
-Response:
-```HTTP
-HTTP/1.1 200 OK
-Date: Wed, 24 Jan 2024 17:20:29 GMT
-Content-Length: 0
-```
-
-- `/rep`
-
-Request:
-```HTTP
-GET /rep HTTP/1.1
-Host: localhost:5000
-User-Agent: curl/7.81.0
-Accept: */*
-```
-
-Response:
-```HTTP
-HTTP/1.1 200 OK
-Content-Type: application/json
-Date: Wed, 24 Jan 2024 17:35:35 GMT
-Content-Length: 98
-
-{"message":{"N":3,"replicas":["Server_3","Server_2","Server_1"]},"status":"successful"}
-```
-
-- `/add`
-
-Request:
-```HTTP
-POST /add HTTP/1.1
-Host: localhost:5000
-User-Agent: curl/7.81.0
-Accept: */*
-Content-Type: application/json
-Content-Length: 57
-
-{"n":3, "hostnames":["Server_4", "Server_5", "Server_6"]}
-```
-
-Response:
-```HTTP
-HTTP/1.1 200 OK
-Content-Type: application/json
-Date: Wed, 24 Jan 2024 17:25:12 GMT
-Content-Length: 120
-
-{"message":{"N":6,"replicas":["Server_6","Server_5","Server_4","Server_3","Server_2","Server_1"]},"status":"successful"}
-```
-
-- `/rm`
-
-Request:
-```HTTP
-DELETE /rm HTTP/1.1
-Host: localhost:5000
-User-Agent: curl/7.81.0
-Accept: */*
-Content-Type: application/json
-Content-Length: 45
-
-{"n":2, "hostnames":["Server_3", "Server_2"]}
-```
-
-Response:
-```HTTP
-HTTP/1.1 200 OK
-Content-Type: application/json
-Date: Wed, 24 Jan 2024 17:32:42 GMT
-Content-Length: 98
-
-{"message":{"N":4,"replicas":["Server_6","Server_5","Server_4","Server_1"]},"status":"successful"}
-```
 
 ### 5. **Perform testing and analysis.**
 
@@ -424,3 +357,237 @@ This document presents an analysis of the load balancer's performance based on t
 - ..............
 
 ---
+
+## Experiment A-3: Endpoint Testing and Server Restoration
+
+### Test Description:
+
+- Send the appropriate HTTP requests to all relevant endpoints.
+- Demonstrate server restoration upon server failure.
+
+### Results:
+
+#### `/home`
+
+Request:
+
+```HTTP
+GET /home HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+```
+
+Response:
+
+```HTTP
+HTTP/1.1 200 OK
+Date: Wed, 24 Jan 2024 17:19:14 GMT
+Content-Length: 59
+Content-Type: text/plain; charset=utf-8
+
+{"message":"Hello from Server: 4727","status":"successful"}
+```
+(Here 4727 is a random server ID assigned by the load balancer.)
+
+#### `/heartbeat`
+
+Response:
+
+```HTTP
+HTTP/1.1 200 OK
+Date: Wed, 24 Jan 2024 17:20:29 GMT
+Content-Length: 0
+```
+
+#### `/rep`
+
+Request:
+
+```HTTP
+GET /rep HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+```
+
+Response:
+
+```HTTP
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 17:35:35 GMT
+Content-Length: 87
+
+{"message":{"N":3,"replicas":["Server_3","Server_2","Server_1"]},"status":"successful"}
+```
+
+#### `/add`
+
+Request with `n == hostnames.length`:
+
+```HTTP
+POST /add HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+Content-Type: application/json
+Content-Length: 57
+
+{"n":3, "hostnames":["Server_4", "Server_5", "Server_6"]}
+```
+
+Response:
+
+```HTTP
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 17:25:12 GMT
+Content-Length: 120
+
+{"message":{"N":6,"replicas":["Server_6","Server_5","Server_4","Server_3","Server_2","Server_1"]},"status":"successful"}
+```
+
+Request with `n > hostnames.length`:
+
+```HTTP
+POST /add HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+Content-Type: application/json
+Content-Length: 33
+
+{"n":2, "hostnames":["Server_7"]}
+```
+
+Response:
+
+```HTTP
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 17:25:12 GMT
+Content-Length: 153
+
+{"message":{"N":8,"replicas":["spawned_server_7135","Server_7","Server_6","Server_5","Server_4","Server_3","Server_2","Server_1"]},"status":"successful"}
+```
+
+Request with `n < hostnames.length`:
+
+```HTTP
+POST /add HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+Content-Type: application/json
+Content-Length: 45
+
+{"n":1, "hostnames":["Server_8", "Server_9"]}
+```
+
+Response:
+
+```HTTP
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 18:06:34 GMT
+Content-Length: 98
+
+{"message":"ERROR: Length of hostname list is more than newly added instances","status":"failure"}
+```
+
+#### `/rm`
+
+Request with `n == hostnames.length`:
+
+```HTTP
+DELETE /rm HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+Content-Type: application/json
+Content-Length: 45
+
+{"n":2, "hostnames":["Server_3", "Server_2"]}
+```
+
+Response:
+
+```HTTP
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 17:32:42 GMT
+Content-Length: 131
+
+{"message":{"N":6,"replicas":["spawned_server_7135","Server_7","Server_6","Server_5","Server_4","Server_1"]},"status":"successful"}
+```
+
+Request with `n > hostnames.length`:
+
+```HTTP
+DELETE /rm HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+Content-Type: application/json
+Content-Length: 45
+
+{"n":3, "hostnames":["Server_1", "Server_4"]}
+```
+
+Response:
+
+```HTTP
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 17:32:42 GMT
+Content-Length: 109
+
+{"message":{"N":4,"replicas":["spawned_server_7135","Server_7","Server_6","Server_5"]},"status":"successful"}
+```
+
+Request with `n < hostnames.length`:
+
+```HTTP
+DELETE /rm HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+Content-Type: application/json
+Content-Length: 45
+
+{"n":1, "hostnames":["Server_6", "Server_7"]}
+```
+
+Response:
+
+```HTTP
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 18:16:20 GMT
+Content-Length: 98
+
+{"message":"ERROR: Length of hostname list is more than newly added instances","status":"failure"}
+```
+
+#### `/other`
+
+Request:
+
+```HTTP
+GET /foobar HTTP/1.1
+Host: localhost:5000
+User-Agent: curl/7.81.0
+Accept: */*
+```
+
+Response:
+
+```HTTP
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Date: Wed, 24 Jan 2024 18:17:47 GMT
+Content-Length: 91
+
+{"message":"ERROR: '/other' endpoint does not exist in server replicas","status":"failure"}
+```
