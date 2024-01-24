@@ -703,7 +703,7 @@ $$
 <br />
 
 ![line_plot](./images/Hash_F22.png)
-### Modified Hash function 1:-
+### Modified Hash function 2:-
 $$
 H(i) = i^2 + 7i + 31
 $$
@@ -717,7 +717,7 @@ $$
 
 ![line_plot](./images/Hash_F32.png)
 
-### Modified Hash function 1:-
+### Modified Hash function 3:-
 $$
 H(i) = sha256sum(i)(mod 512)
 $$
