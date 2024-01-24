@@ -56,6 +56,7 @@ lb                         latest    d62b10df29ff   17 minutes ago   10.9MB
 server                     latest    b2c8134fdacd   4 hours ago      7.86MB
 ```
 ### 3. **Start the load balancer system.**
+<b>Note: </b> Use ``sudo`` if necessary
 ```sh
 make run
 ```
@@ -709,7 +710,7 @@ H(i) = i^2 + 7i + 31
 $$
 
 $$
-\phi(i, j) = i^2 + j^2 + (i\&j) + ((i>>4) \oplus (j >> 3))
+\phi(i, j) = i^2 + j^2 + (i \& j) + ((i>>4) \oplus (j >> 3))
 $$
 
 ![bar_plot](./images/Hash_F31.png)
@@ -730,3 +731,38 @@ $$
 <br />
 
 ![line_plot](./images/Hash_42.png)
+
+# Monitoring Docker Containers with cAdvisor
+cAdvisor helps to monitor the docker containers in the form of a GUI. It tracks the memory, CPU and Network usage of docker containers.
+
+Run ``make monitor`` to use it in ``http://localhost:8080``.
+
+## Sample images:
+### Homepage
+![homepage1](./images/cadvisor/homepage.png)
+
+![homepage2](./images/cadvisor/docker_container.png)
+
+### Servers
+#### CPU Usage
+![server_cpu](./images/cadvisor/server-cpu.png)
+
+![server_cpu2](./images/cadvisor/server1.png)
+
+### Load Balancer
+#### CPU and Memory Usage
+![lb2](./images/cadvisor/lb_cpu2.png)
+
+![lb1](./images/cadvisor/lb_cpu.png)
+
+#### Network
+![lb3](./images/cadvisor/lb-network.png)
+
+## Contributors:
+- Kartik Pontula (20CS10031)
+- Prakhar Singh (20CS10045)
+- Shiladitya De (20CS30061)
+- Sourabh Soumyakanta Das (20CS30051)
+
+
+
