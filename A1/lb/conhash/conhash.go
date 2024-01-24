@@ -115,12 +115,6 @@ func (c *ConHash) RemoveServer(Name string) int {
 		return 0
 	}
 
-	for i := range c.HashD {
-		if c.HashD[i].Name == Name {
-			c.HashD[i] = Node{false, ""}
-		}
-	}
-
 	for j := 0; j < c.VirtServ; j++ {
 		hash := c.getServHash(c.ServerID[Name], j)
 		for c.HashD[hash].Name != Name {

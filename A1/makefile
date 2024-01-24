@@ -1,8 +1,8 @@
 run:
-	sudo docker compose up
+	cd lb && sudo docker compose up
 
 down:
-	sudo docker compose down
+	cd lb && sudo docker compose down
 
 monitor:
 	sudo docker run \
