@@ -447,7 +447,9 @@ func listServerContainers() ([]string, error) {
 		
 	hostnames := []string{}
 	for _, container := range containers {
-		for network := range container.NetworkSettings.Networks {
+		containerInfo, _ := client.InspectContainer(container.ID)
+
+		for network := range containerInfo.NetworkSettings.Networks {
 			if network == "net1" {
 				for _, name := range container.Names {
 					cleanName := strings.TrimPrefix(name, "/")
@@ -479,7 +481,7 @@ func addServerContainer(serverName string, serverNumber int) error {
 	createContainerOptions := docker.CreateContainerOptions{
         Name: serverName,
         Config: &docker.Config{
-            Image: "alutnopk/go-http-server",
+            Image: "server",
             Env: []string{"SERVER_NUMBER=" + strconv.Itoa(serverNumber)},
         },
         HostConfig: &docker.HostConfig{

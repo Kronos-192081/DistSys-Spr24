@@ -7,22 +7,26 @@ services:
     container_name: lb
     ports:
       - 0.0.0.0:5000:5000
+    environment:
+      - NUM_SERV=3
+      - NUM_SLOTS=512
+      - NUM_VIRT_SERV=9
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      net1:
+      - default
 
-  # server:
-  #   depends_on:
-  #     - lb
-    # build: ./server
-    # image: server
+  server:
+    # depends_on:
+    #   - lb
+    build: ./server
+    image: server
     # container_name: server
     # ports:
-    #   - 5000:5000
+      # - 5000:5000
     # networks:
-    #   net1:
+      # net1:
 
 networks:
-  net1:
+  default:
     name: net1
