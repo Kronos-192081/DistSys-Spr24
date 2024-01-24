@@ -695,7 +695,7 @@ Content-Length: 91
 {"message":"ERROR: '/other' endpoint does not exist in server replicas","status":"failure"}
 ```
 
-## Modifying the Hash functions $H(i) $ and $\phi(i, j)$
+## Modifying the Hash functions $H(i)$ and $\phi(i, j)$
 ### Modified Hash function 1:-
 $$
 H(i) = i^2 + 2i + 17
