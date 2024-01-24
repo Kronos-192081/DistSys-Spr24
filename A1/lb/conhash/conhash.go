@@ -136,7 +136,7 @@ func (c *ConHash) GetServer(id int) string {
 		return "No Server Allocable"
 	}
 	hash := c.getCliHash(id)
-	fmt.Println("hash for ", id, " --> ", hash)
+	// fmt.Println("hash for ", id, " --> ", hash)
 	hash = (hash + 1) % c.Size
 	for !c.HashD[hash].Occ {
 		hash = (hash + 1) % c.Size
