@@ -1,8 +1,24 @@
 package conhash
 
 import (
+	// "crypto/sha256" 
+	// "encoding/binary"
 	"fmt"
 )
+
+// func last9BitsSHA256(number uint64) int {
+// 	// Convert the number to bytes
+// 	dataBytes := make([]byte, 8)
+// 	binary.BigEndian.PutUint64(dataBytes, number)
+
+// 	// Calculate the SHA-256 hash
+// 	hash := sha256.Sum256(dataBytes)
+
+// 	// Extract the last 9 bits from the hash
+// 	last9Bits := int(binary.BigEndian.Uint16(hash[len(hash)-2:]) & 0b111111111)
+
+// 	return last9Bits
+// }
 
 
 // Node represents a node in the ConHash structure.
@@ -34,13 +50,13 @@ func NewConHash(m, k int) *ConHash {
 }
 
 func (c *ConHash) getServHash(i, j int) int {
-	val := 1*i*i + 1*j*j + 2*j + 25
+	val := i*i + j*j + 2*j + 25
 	val %= int(c.Size)
 	return int(val)
 }
 
 func (c *ConHash) getCliHash(i int) int {
-	val := 1*i*i + 1*2*i + 17
+	val := i*i + 2*i + 17
 	val %= int(c.Size)
 	return int(val)
 }

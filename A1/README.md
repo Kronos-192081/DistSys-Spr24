@@ -424,11 +424,10 @@ This document presents an analysis of the load balancer's performance based on t
 
 **Observations:**
 
-- ......
-- ..........
+- We can see that the distribution of load is very much skewed.
 
 **Conclusion:**
-- ..............
+- This is due to the inability of the hash function to produce random numbers, i.e. it is not a pseudo random number generator (PRNG).
 
 ---
 
@@ -450,13 +449,10 @@ This document presents an analysis of the load balancer's performance based on t
 - Time taken: 25.5 seconds (average)
 - Memory usage: 2.5 GB
 
-**Observations:**
+**Observations and Conclusions:**
 
-- ..............
-- ..................
-
-**Conclusion:**
-- ..............
+- We can see that the average load follows the function 10000/N. 
+- However, in such case standard deviation tells a lot about the distribution. In this case for N = 5 we get the minimum value which tells that for N = 5, the distribution is almost uniform. 
 
 ---
 
@@ -693,3 +689,44 @@ Content-Length: 91
 
 {"message":"ERROR: '/other' endpoint does not exist in server replicas","status":"failure"}
 ```
+
+## Modifying the Hash functions $H(i) $ and $\phi(i, j)$
+### Modified Hash function 1:-
+$$
+H(i) = i^2 + 2i + 17
+$$
+
+$$
+\phi(i, j) = i^2 + j^2 + 2j + 25
+$$
+![bar_plot](./images/Hash_F21.png)
+<br />
+
+![line_plot](./images/Hash_F22.png)
+### Modified Hash function 1:-
+$$
+H(i) = i^2 + 7i + 31
+$$
+
+$$
+\phi(i, j) = i^2 + j^2 + (i\&j) + ((i>>4) \oplus (j >> 3))
+$$
+
+![bar_plot](./images/Hash_F31.png)
+<br />
+
+![line_plot](./images/Hash_F32.png)
+
+### Modified Hash function 1:-
+$$
+H(i) = sha256sum(i)(mod 512)
+$$
+
+$$
+\phi(i, j) = sha256sum(i|j)(mod 512)
+$$
+
+![bar_plot](./images/Hash_F41.png)
+<br />
+
+![line_plot](./images/Hash_42.png)
