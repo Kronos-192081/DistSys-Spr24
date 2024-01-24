@@ -18,6 +18,7 @@ type ConHash struct {
 	VirtServ   	int
 	Nserv       int
 	AllServers map[string]int
+	ServerID map[string]int
 }
 
 // NewConHash creates a new ConHash instance.
@@ -62,6 +63,7 @@ func (c *ConHash) Add(ids []int, Names []string) int {
 
 	for i := 0; i < len(ids); i++ {
 		c.AllServers[Names[i]] = 1
+		c.ServerID[Names[i]] = ids[i]
 		for j := 0; j < c.VirtServ; j++ {
 			hash := c.getServHash(ids[i], j)
 			for c.HashD[hash].Occ {
@@ -94,6 +96,7 @@ func (c *ConHash) AddServer(id int, Name string) int {
 
 	c.Nserv++
 	c.AllServers[Name] = 1
+	c.ServerID[Name] = id
 
 	for j := 0; j < c.VirtServ; j++ {
 		hash := c.getServHash(id, j)
@@ -117,7 +120,17 @@ func (c *ConHash) RemoveServer(Name string) int {
 			c.HashD[i] = Node{false, ""}
 		}
 	}
+
+	for j := 0; j < c.VirtServ; j++ {
+		hash := c.getServHash(c.ServerID[Name], j)
+		for c.HashD[hash].Name != Name {
+			hash = (hash + 1)%c.Size
+		}
+		c.HashD[hash] = Node{false, ""}
+	}
+
 	delete(c.AllServers, Name)
+	delete(c.ServerID, Name)
 	c.Nserv--
 	return 1
 }

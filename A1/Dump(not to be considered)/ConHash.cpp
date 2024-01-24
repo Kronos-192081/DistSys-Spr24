@@ -19,6 +19,7 @@ class ConHash{
     int vs;
     int len = 0;
     map<string, int> all_server;
+    map<string, int> server_id;
 
     int get_serv_hash(int i, int j)
     {
@@ -55,6 +56,7 @@ class ConHash{
         for(int i = 0; i<(int)ids.size(); i++)
         {
             all_server[names[i]] = 1;
+            server_id[names[i]] = ids[i];
             for(int j = 0; j<vs; j++)
             {
                 int hash = get_serv_hash(ids[i], j);
@@ -81,6 +83,7 @@ class ConHash{
         if((len+1)*vs >= size) return 0;
         len++;
         all_server[name] = 1;
+        server_id[name] = id;
         for(int j = 0; j<vs; j++)
         {
             int hash = get_serv_hash(id, j);
@@ -96,13 +99,16 @@ class ConHash{
 
     int rem(string name){
         if(all_server.find(name) == all_server.end()) return 0;
-        for(auto &j: hash_d)
+
+        for(int j = 0; j<vs; j++)
         {
-            if(j.name == name) {
-                j = {false, ""};
-            }
+            int hash = get_serv_hash(server_id[name], j);
+            while(hash_d[hash].name != name) { hash = (hash + 1)%size; }
+            hash_d[hash] = {false, ""};
         }
         all_server.erase(name);
+        server_id.erase(name);
+        len--;
         return 1;
     }
 
