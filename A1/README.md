@@ -193,7 +193,7 @@ make clean
 - **ENTRYPOINT ["/docker-server"]:**
   - Sets the entry point for the container to run the `/docker-server` executable.
 
-This Dockerfile follows a multi-stage build approach, optimizing the final image size by using a minimal scratch image for deployment. It first builds the Go application in one stage and then copies only the necessary artifacts to the final deployment image. The resulting container is lightweight and contains only the compiled executable and minimal dependencies.
+<b> Design Choice: </b> This Dockerfile follows a multi-stage build approach, optimizing the final image size by using a minimal scratch image for deployment. It first builds the Go application in one stage and then copies only the necessary artifacts to the final deployment image. The resulting container is lightweight and contains only the compiled executable and minimal dependencies.
 
 
 
@@ -228,7 +228,7 @@ This Dockerfile follows a multi-stage build approach, optimizing the final image
 ## Functional Endpoints
 
 ### 1. Add Servers
-
+<b>Note: </b> Linear probing is used to resolve conflicts.
 - **Method:** `Add(ids []int, Names []string) int`
   - Adds servers to the consistent hash ring.
   - Takes an array of server IDs and corresponding names.
@@ -236,7 +236,7 @@ This Dockerfile follows a multi-stage build approach, optimizing the final image
   - Checks if the size limit is exceeded.
   - Returns 1 on success, 0 on failure.
 
-### 2. Get Configuration
+### 2. Get Configuration (For debugging purposes)
 
 - **Method:** `GetConfig()`
   - Prints the configuration of the consistent hash ring.
@@ -251,7 +251,7 @@ This Dockerfile follows a multi-stage build approach, optimizing the final image
   - Returns 1 on success, 0 on failure.
 
 ### 4. Remove Server
-
+<b> Time Complexity:</b>  &nbsp; $\mathcal{O(K)}$ time complexity, where $\mathcal{K}$ is the number of virtual servers. 
 - **Method:** `RemoveServer(Name string) int`
   - Removes a server from the consistent hash ring.
   - Returns 1 on success, 0 on failure.
@@ -299,6 +299,7 @@ fmt.Println("Allocated Server:", server)
 ```
 
 # Load Balancer Implementation
+<b> Design Choice: </b> The load balancer is multithreaded and uses ``goroutines`` and mutex locks for implementation. This is done for parallel handling of incoming requests. 
 
 ### Environment Variables
 
@@ -307,10 +308,10 @@ fmt.Println("Allocated Server:", server)
 ## Initialization
 
 - `num_serv` number of servers are spawned.
-- `rep` handler for handling GET requests to \rep
-- `add` handler for handling POST requests to \add
-- `rm` handler for handling DELETE requests to \rm
-- `path` handler for handling all other requests out of which only GET requests to \home and \heartbeat are processed
+- `rep` handler for handling GET requests to /rep
+- `add` handler for handling POST requests to /add
+- `rm` handler for handling DELETE requests to /rm
+- `path` handler for handling all other requests out of which only GET requests to /home and /heartbeat are processed
 
 ## Data Structures used
 
@@ -333,7 +334,7 @@ fmt.Println("Allocated Server:", server)
   - `Status` : Status of the response for the request sent by the client.
 
 ### Response
-- It stores the details of message received during request to server at \home and \heartbeat.
+- It stores the details of message received during request to server at /home and /heartbeat.
 - Attributes
   - `Message` : The message from the server that is to be sent to the client.
   - `Status` : Status of the response for the request sent by the client.
@@ -370,13 +371,13 @@ fmt.Println("Allocated Server:", server)
 - Additionally, it also removes the server from the conhash data structure.
 
 ## `rep` handler function
-- Handles only `GET` requests to \rep
+- Handles only `GET` requests to /rep
 - Uses `listServerContainers()` to get the list of active docker containers.
 - Stores the details in the `ServDetails struct` and packs that within the `ResponseSuccess struct` and sends to the client with a status OK.
 - All other errors are handled as Internal Server errors.
 
 ## `add` handler function
-- Handles only `POST` requests to \add
+- Handles only `POST` requests to /add
 - Receives the client request in a `Payload struct`
 - Adds the required servers
 - Error in case server is already present
@@ -386,7 +387,7 @@ fmt.Println("Allocated Server:", server)
 - All other errors are handled as Internal Server errors.
 
 ## `rm` handler function
-- Handles only `DELETE` requests to \rm
+- Handles only `DELETE` requests to /rm
 - Receives the client request in a `Payload struct`
 - Removes the required servers
 - Error in case server is absent
@@ -396,7 +397,7 @@ fmt.Println("Allocated Server:", server)
 - All other errors are handled as Internal Server errors.
 
 ## `path` handler function
-- Handles only `GET` requests on the path \home and \heartbeat
+- Handles only `GET` requests on the path /home and /heartbeat
 - It performs `serverHeartbeat` which returns a successful url.
 - Th response is packed in a `Response struct` with status code OK and sent to the client.
 - All other errors are handled as Internal Server errors.
@@ -698,11 +699,11 @@ Content-Length: 91
 ## Modifying the Hash functions $H(i)$ and $\phi(i, j)$
 ### Modified Hash function 1:-
 $$
-H(i) = i^2 + 2i + 17
+H(i) = i^2 + 7i + 31
 $$
 
 $$
-\phi(i, j) = i^2 + j^2 + 2j + 25
+\phi(i, j) = i^2 + j^2 + i + j - (i | j) + ((i>>4) \oplus (j >> 3))
 $$
 
 ![bar_plot](./images/Hash_F21.png)
@@ -711,11 +712,11 @@ $$
 ![line_plot](./images/Hash_F22.png)
 ### Modified Hash function 2:-
 $$
-H(i) = i^2 + 7i + 31
+H(i) = i^2 + 7i + 63
 $$
 
 $$
-\phi(i, j) = i^2 + j^2 + i + j - (i | j) + ((i>>4) \oplus (j >> 3))
+\phi(i, j) = i^2 + j^2 + (i | j)
 $$
 
 ![bar_plot](./images/Hash_F31.png)
