@@ -4,6 +4,7 @@ This repository contains our submissions for the assignments of Distributed Syst
 
 ## Contents
 - Assignment 1: [Customizable Load Balancer](./A1/)
+- Assignment 2: [Scalable Sharded Database](./A2/)
 
 ## Contributors:
 - Kartik Pontula (20CS10031)
