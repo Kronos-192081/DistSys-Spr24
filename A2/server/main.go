@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	_ "github.com/lib/pq"
 )
@@ -73,6 +74,346 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func copyHandler(w http.ResponseWriter, r *http.Request) {
+	var copyReq copyRequest
+	err := json.NewDecoder(r.Body).Decode(&copyReq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("Received copy request:", copyReq) // debug
+
+	var err_resp map[string]string
+
+	var final_result = make(map[string][]Row)
+
+	for i := 0; i < len(copyReq.Shards); i++ {
+		q := fmt.Sprintf("SELECT * FROM %s;", copyReq.Shards[i])
+		rows, err := db.Query(q)
+		if err != nil {
+			fmt.Println("Error querying the database:", err)
+			err_resp = map[string]string{
+				"message": "Error querying the database",
+				"status":  "error",
+			}
+			jsonResponse, err := json.Marshal(err_resp)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write(jsonResponse)
+			return
+		}
+
+		result := make([]Row, 0)
+		for rows.Next() {
+			var row Row
+			err = rows.Scan(&row.Stud_id, &row.Stud_name, &row.Stud_marks)
+			if err != nil {
+				fmt.Println("Error scanning the rows:", err)
+				err_resp = map[string]string{
+					"message": "Error scanning the rows",
+					"status":  "error",
+				}
+				jsonResponse, err := json.Marshal(err_resp)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write(jsonResponse)
+				return
+			}
+			result = append(result, row)
+		}
+
+		fmt.Println("Result:", result) // debug
+		final_result[copyReq.Shards[i]] = result
+	}
+
+	response := map[string]interface{}{
+		"status": "success",
+	}
+
+	for i := 0; i < len(copyReq.Shards); i++ {
+		response[copyReq.Shards[i]] = final_result[copyReq.Shards[i]]
+	}
+
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonResponse)
+}
+
+func readHandler(w http.ResponseWriter, r *http.Request) {
+	var readReq readRequest
+	err := json.NewDecoder(r.Body).Decode(&readReq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("Received read request:", readReq) // debug
+
+	var err_resp map[string]string
+
+	q := fmt.Sprintf("SELECT * FROM %s WHERE %s BETWEEN %d AND %d;", readReq.Shard, "stud_id", readReq.Stud_id.Low, readReq.Stud_id.High)
+
+	rows, err := db.Query(q)
+	if err != nil {
+		fmt.Println("Error querying the database:", err)
+		err_resp = map[string]string{
+			"message": "Error querying the database",
+			"status":  "error",
+		}
+		jsonResponse, err := json.Marshal(err_resp)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write(jsonResponse)
+		return
+	}
+
+	result := make([]Row, 0)
+	for rows.Next() {
+		var row Row
+		err = rows.Scan(&row.Stud_id, &row.Stud_name, &row.Stud_marks)
+		if err != nil {
+			fmt.Println("Error scanning the rows:", err)
+			err_resp = map[string]string{
+				"message": "Error scanning the rows",
+				"status":  "error",
+			}
+			jsonResponse, err := json.Marshal(err_resp)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write(jsonResponse)
+			return
+		}
+		result = append(result, row)
+	}
+
+	response := map[string]interface{}{
+		"data":   result,
+		"status": "success",
+	}
+
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonResponse)
+}
+
+func writeHandler(w http.ResponseWriter, r *http.Request) {
+	var writeReq writeRequest
+	err := json.NewDecoder(r.Body).Decode(&writeReq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("Received write request:", writeReq) // debug
+
+	var err_resp map[string]string
+
+	var values []string
+	for _, data := range writeReq.Data {
+		value := fmt.Sprintf("(%d, '%s', %d)", data.Stud_id, data.Stud_name, data.Stud_marks)
+		values = append(values, value)
+	}
+
+	q := fmt.Sprintf("INSERT INTO %s VALUES %s;", writeReq.Shard, strings.Join(values, ","))
+	_, err = db.Exec(q)
+	if err != nil {
+		fmt.Println("Error inserting into the database:", err)
+		err_resp = map[string]string{
+			"message": "Error inserting into the database",
+			"status":  "error",
+		}
+		jsonResponse, err := json.Marshal(err_resp)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write(jsonResponse)
+		return
+	}
+
+	response := map[string]string{
+		"message":  "Data entries added",
+		"curr_idx": fmt.Sprintf("%d", writeReq.Curr_idx+len(writeReq.Data)),
+		"status":   "success",
+	}
+
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonResponse)
+}
+
+func updateHandler(w http.ResponseWriter, r *http.Request) {
+	var updateReq updateRequest
+	err := json.NewDecoder(r.Body).Decode(&updateReq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("Received update request:", updateReq) // debug
+
+	var err_resp map[string]string
+
+	q := fmt.Sprintf("UPDATE %s SET %s = %d, %s = '%s', %s = %d WHERE %s = %d;", updateReq.Shard, "stud_id", updateReq.Data.Stud_id, "stud_name", updateReq.Data.Stud_name, "stud_marks", updateReq.Data.Stud_marks, "stud_id", updateReq.Stud_id)
+
+	res, err := db.Exec(q)
+	if err != nil {
+		fmt.Println("Error updating the database:", err)
+		err_resp = map[string]string{
+			"message": "Error updating the database",
+			"status":  "error",
+		}
+		jsonResponse, err := json.Marshal(err_resp)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write(jsonResponse)
+		return
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		fmt.Println("Error getting rows affected:", err)
+		return
+	}
+
+	if count == 0 {
+		err_resp = map[string]string{
+			"message": fmt.Sprintf("No data entry found for Stud_id:%d", updateReq.Stud_id),
+			"status":  "error",
+		}
+		jsonResponse, err := json.Marshal(err_resp)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(jsonResponse)
+		return
+	}
+
+	response := map[string]string{
+		"message": fmt.Sprintf("Data entry for Stud_id:%d updated", updateReq.Stud_id),
+		"status":  "success",
+	}
+
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonResponse)
+}
+
+func deleteHandler(w http.ResponseWriter, r *http.Request) {
+	var deleteReq deleteRequest
+	err := json.NewDecoder(r.Body).Decode(&deleteReq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("Received delete request:", deleteReq) // debug
+
+	var err_resp map[string]string
+
+	q := fmt.Sprintf("DELETE FROM %s WHERE %s = %d;", deleteReq.Shard, "stud_id", deleteReq.Stud_id)
+
+	res, err := db.Exec(q)
+	if err != nil {
+		fmt.Println("Error deleting the database:", err)
+		err_resp = map[string]string{
+			"message": "Error deleting the database",
+			"status":  "error",
+		}
+		jsonResponse, err := json.Marshal(err_resp)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write(jsonResponse)
+		return
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		fmt.Println("Error getting rows affected:", err)
+		return
+	}
+
+	if count == 0 {
+		err_resp = map[string]string{
+			"message": fmt.Sprintf("No data entry found for Stud_id:%d", deleteReq.Stud_id),
+			"status":  "error",
+		}
+		jsonResponse, err := json.Marshal(err_resp)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(jsonResponse)
+		return
+	}
+
+	response := map[string]string{
+		"message": fmt.Sprintf("Data entry for Stud_id:%d deleted", deleteReq.Stud_id),
+		"status":  "success",
+	}
+
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonResponse)
+}
+
 var db *sql.DB
 
 func main() {
@@ -101,6 +442,11 @@ func main() {
 	http.HandleFunc("/home", homeHandler)
 	http.HandleFunc("/heartbeat", heartbeatHandler)
 	http.HandleFunc("/config", configHandler)
+	http.HandleFunc("/read", readHandler)
+	http.HandleFunc("/copy", copyHandler)
+	http.HandleFunc("/write", writeHandler)
+	http.HandleFunc("/update", updateHandler)
+	http.HandleFunc("/del", deleteHandler)
 
 	httpPort := os.Getenv("PORT")
 	if httpPort == "" {
@@ -114,6 +460,12 @@ func main() {
 	}
 }
 
+type Row struct {
+	Stud_id    int    `json:"Stud_id"`
+	Stud_name  string `json:"Stud_name"`
+	Stud_marks int    `json:"Stud_marks"`
+}
+
 type dbSchema struct {
 	Columns []string `json:"columns"`
 	Dtypes  []string `json:"dtypes"`
@@ -122,6 +474,37 @@ type dbSchema struct {
 type dbConfig struct {
 	Schema dbSchema `json:"schema"`
 	Shards []string `json:"shards"`
+}
+
+type rangeID struct {
+	Low  int
+	High int
+}
+
+type copyRequest struct {
+	Shards []string `json:"shards"`
+}
+
+type readRequest struct {
+	Shard   string  `json:"shard"`
+	Stud_id rangeID `json:"stud_id"`
+}
+
+type writeRequest struct {
+	Shard    string `json:"shard"`
+	Curr_idx int    `json:"curr_idx"`
+	Data     []Row  `json:"data"`
+}
+
+type updateRequest struct {
+	Shard   string `json:"shard"`
+	Stud_id int    `json:"stud_id"`
+	Data    Row    `json:"data"`
+}
+
+type deleteRequest struct {
+	Shard   string `json:"shard"`
+	Stud_id int    `json:"stud_id"`
 }
 
 func dbSetup(config dbConfig) bool {
@@ -138,22 +521,5 @@ func dbSetup(config dbConfig) bool {
 		fmt.Println("Error creating table:", _err)
 		return false
 	}
-
-	// var q3 string = "SELECT * FROM sh1;"
-	// rows, err := db.Query(q3)
-	// if err != nil {
-	// 	fmt.Println("Error querying table:", err)
-	// }
-	// defer rows.Close()
-	// for rows.Next() {
-	// 	var Stud_id int
-	// 	var Stud_name string
-	// 	var Stud_marks int
-	// 	err = rows.Scan(&Stud_id, &Stud_name, &Stud_marks)
-	// 	if err != nil {
-	// 		fmt.Println("Error scanning rows:", err)
-	// 	}
-	// 	fmt.Println(Stud_id, Stud_name, Stud_marks)
-	// }
 	return true
 }
