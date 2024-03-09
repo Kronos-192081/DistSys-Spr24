@@ -5,6 +5,7 @@ go 1.21.6
 require (
 	github.com/fsouza/go-dockerclient v1.10.1
 	prakhar/conhash v0.0.0-00010101000000-000000000000
+	github.com/mattn/go-sqlite3 v1.14.0
 )
 
 require (
