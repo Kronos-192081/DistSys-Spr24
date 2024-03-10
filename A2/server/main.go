@@ -42,8 +42,15 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Received config:", config) // debug
 
+	serverNo := os.Getenv("SERVER_NUMBER")
+	msgStr := ""
+	for i := 0; i < len(config.Shards)-1; i++ {
+		msgStr += "Server" + serverNo + ":" + config.Shards[i] + ", "
+	}
+	msgStr += "Server" + serverNo + ":" + config.Shards[len(config.Shards)-1] + " configured"
+
 	response := map[string]string{
-		"message": "Config received and processed successfully",
+		"message": msgStr,
 		"status":  "success",
 	}
 
@@ -508,18 +515,13 @@ type deleteRequest struct {
 }
 
 func dbSetup(config dbConfig) bool {
-	var q1 string = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s INT PRIMARY KEY, %s VARCHAR(255), %s INT);", config.Shards[0], config.Schema.Columns[0], config.Schema.Columns[1], config.Schema.Columns[2])
-	var q2 string = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s INT PRIMARY KEY, %s VARCHAR(255), %s INT);", config.Shards[1], config.Schema.Columns[0], config.Schema.Columns[1], config.Schema.Columns[2])
-	_, err := db.Exec(q1)
-	if err != nil {
-		fmt.Println("Error creating table:", err)
-		return false
-	}
-
-	_, _err := db.Exec(q2)
-	if _err != nil {
-		fmt.Println("Error creating table:", _err)
-		return false
+	for i := 0; i < len(config.Shards); i++ {
+		var q string = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s INT PRIMARY KEY, %s VARCHAR(255), %s INT);", config.Shards[i], config.Schema.Columns[0], config.Schema.Columns[1], config.Schema.Columns[2])
+		_, err := db.Exec(q)
+		if err != nil {
+			fmt.Println("Error creating table:", err)
+			return false
+		}
 	}
 	return true
 }
