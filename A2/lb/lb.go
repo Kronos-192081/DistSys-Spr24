@@ -80,7 +80,7 @@ type readPayload struct {
 type data struct {
 	Stud_id  	int
 	Stud_name 	string
-	Stud_marks 	string
+	Stud_marks 	int
 }
 
 type copyPayload struct {
@@ -163,11 +163,12 @@ var mtx sync.Mutex
 func main() {
 	fmt.Println("Starting load balancer")
 
-	db, err := sql.Open("sqlite3", "lb.db")
+	d, err := sql.Open("sqlite3", "lb.db")
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
+	db = d
 	defer db.Close()
 
 	_, err = db.Exec("CREATE TABLE IF NOT EXISTS ShardT (Stud_id_low INTEGER PRIMARY KEY, Shard_id TEXT, Shard_size INTEGER, valid_idx INTEGER)")
@@ -300,11 +301,12 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
+		println("Payload decoded")
 		serv_schema = payloadData.Schema
 
 		for _, shard := range payloadData.Shards {
 			_, err := db.Exec("INSERT INTO ShardT (Stud_id_low, Shard_id, Shard_size, valid_idx) VALUES (?, ?, ?, ?)", shard.Stud_id_low, shard.Shard_id, shard.Shard_size, 0)
+			println("db insert done : ", shard.Shard_id)
 			if err != nil {
 				fmt.Println("Error:", err)
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -312,6 +314,8 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 			}
 			ConHashList[shard.Shard_id] = conhash.NewConHash(num_slots, num_virt_serv)
 		}
+
+		println("Conhash init")
 
 		for servName, shards := range payloadData.Servers {
 			err = addServerContainer(servName, rand.Intn(Mod), shards)
@@ -321,7 +325,8 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 			ServerList[servName] = true
-
+			println("server added : ", servName)
+			time.Sleep(1 * time.Second)
 			configServData := configPayload{
 				Schema: serv_schema,
 				Shards: shards,
@@ -333,10 +338,12 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 				rw.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+			println("payload generated")
 
 			// heartbeat required
 			url := "http://" + servName + ":5000"
 			servResp, err := http.Post(url + "/config", "application/json", bytes.NewReader(jsonBody))
+			println("data received")
 			if err != nil {
 				fmt.Println("Error:", err)
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -355,8 +362,8 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 					rw.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-				ConHashList[shard].AddServer(rand.Intn(Mod), servName)
 			}
+			println("added to mapt")
 		}
 
 		resp := Response{
@@ -494,6 +501,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 
 			for k, v := range payloadData.Servers {
 				var servName string
+				time.Sleep(1*time.Second)
 				if match, _ := regexp.MatchString("Server\\[[0-9]+\\]", k); match {
 					for {
 						num := rand.Intn(Mod)
@@ -524,6 +532,8 @@ func add(rw http.ResponseWriter, req *http.Request) {
 					server_names = append(server_names, k)
 					servName = k
 				}
+				time.Sleep(1*time.Second)
+				
 
 				for _, shard_id := range v {
 					_, err = db.Exec("INSERT INTO MapT (Shard_id, Server_id) VALUES (?, ?)", shard_id, servName)
@@ -600,12 +610,14 @@ func add(rw http.ResponseWriter, req *http.Request) {
 					}
 
 					var shard_data map[string]interface{}
+					
 					err = json.NewDecoder(servResp.Body).Decode(&shard_data)
 					if err != nil {
 						fmt.Println("Error:", err)
 						rw.WriteHeader(http.StatusInternalServerError)
 						return
 					}
+					// fmt.Println(shard_data) // debug
 
 					if _, ok := shard_data["status"]; !ok {
 						fmt.Println("Error: Server failed")
@@ -619,7 +631,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						return
 					}
 
-					for k, v := range shard_data {
+					for k, val := range shard_data {
 						if k == "status" {
 							continue
 						}
@@ -627,8 +639,10 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						writeServData := writeServPayload{
 							Shard: k,
 							Curr_idx: 0,
-							Data: v.([]data),
+							Data: val.([]data),
 						}
+
+						fmt.Println(writeServData)
 
 						jsonBody, err := json.Marshal(writeServData)
 						if err != nil {
@@ -653,7 +667,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						// write failure handling
 					}
 
-					ConHashList[shard].AddServer(rand.Intn(Mod), servName)
+					// ConHashList[shard].AddServer(rand.Intn(Mod), servName)
 				}
 			}
 
