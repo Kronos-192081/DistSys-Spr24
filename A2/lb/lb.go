@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 	"math/rand"
-	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,7 +18,7 @@ import (
 	"errors"
 	"prakhar/conhash"
 	"github.com/fsouza/go-dockerclient"
-	"databases/sql"
+	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
 )
 
