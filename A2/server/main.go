@@ -267,10 +267,10 @@ func writeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := map[string]string{
-		"message":  "Data entries added",
-		"curr_idx": fmt.Sprintf("%d", writeReq.Curr_idx+len(writeReq.Data)),
-		"status":   "success",
+	response := writeServResponse{
+		Message:  "Data entries added",
+		Curr_idx: writeReq.Curr_idx + len(writeReq.Data),
+		Status:   "success",
 	}
 
 	jsonResponse, err := json.Marshal(response)
@@ -512,6 +512,12 @@ type updateRequest struct {
 type deleteRequest struct {
 	Shard   string `json:"shard"`
 	Stud_id int    `json:"stud_id"`
+}
+
+type writeServResponse struct {
+	Message  string `json:"message"`
+	Curr_idx int    `json:"curr_idx"`
+	Status   string `json:"status"`
 }
 
 func dbSetup(config dbConfig) bool {
