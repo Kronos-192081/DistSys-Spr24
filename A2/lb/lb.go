@@ -319,11 +319,15 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 		println("Conhash init")
 
 		for servName, shards := range payloadData.Servers {
-			err = addServerContainer(servName, rand.Intn(Mod), shards)
+			servID := rand.Intn(Mod)
+			err = addServerContainer(servName, servID)
 			if err != nil {
 				fmt.Println("Error:", err)
 				rw.WriteHeader(http.StatusInternalServerError)
 				return
+			}
+			for _, shard := range shards {
+				ConHashList[shard].AddServer(servID, servName)
 			}
 			ServerList[servName] = true
 			println("server added : ", servName)
@@ -502,6 +506,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 
 			for k, v := range payloadData.Servers {
 				var servName string
+				servID := rand.Intn(Mod)
 				time.Sleep(1 * time.Second)
 				if match, _ := regexp.MatchString("Server\\[[0-9]+\\]", k); match {
 					for {
@@ -510,12 +515,13 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						if _, ok := ServerList[name]; ok {
 							continue
 						}
-						err = addServerContainer(name, num, v)
+						err = addServerContainer(name, num)
 						if err != nil {
 							fmt.Println("Error:", err)
 							rw.WriteHeader(http.StatusInternalServerError)
 							return
 						}
+						servID = num
 						ServerList[name] = true
 						server_names = append(server_names, name)
 						servName = name
@@ -523,7 +529,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						break
 					}
 				} else {
-					err := addServerContainer(k, rand.Intn(Mod), v)
+					err := addServerContainer(k, servID)
 					if err != nil {
 						fmt.Println("Error:", err)
 						rw.WriteHeader(http.StatusInternalServerError)
@@ -536,7 +542,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 				time.Sleep(1 * time.Second)
 
 				for _, shard_id := range v {
-					_, err = db.Exec("INSERT INTO MapT (Shard_id, Server_id) VALUES (?, ?)", shard_id, servName)
+					_, err = db.Exec("INSERT INTO MapT (Shard_id, Server_id) VALUES (?, ?);", shard_id, servName)
 					if err != nil {
 						fmt.Println("Error:", err)
 						rw.WriteHeader(http.StatusInternalServerError)
@@ -579,6 +585,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						}
 					}
 					if exists {
+						ConHashList[shard].AddServer(servID, servName)
 						continue
 					}
 
@@ -624,11 +631,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						return
 					}
 
-					fmt.Println(shard_data)
-
-					status := shard_data["status"]
-
-					if status != "success" {
+					if shard_data["status"] != "success" {
 						fmt.Println("Error: Server failed")
 						rw.WriteHeader(http.StatusInternalServerError)
 						return
@@ -641,14 +644,26 @@ func add(rw http.ResponseWriter, req *http.Request) {
 							continue
 						}
 
-						data_list := val.([]data)
+						if _, ok := val.(interface{}); ok { // val is empty
+							continue
+						}
+
+						// fmt.Println(val)
+						// fmt.Println(reflect.TypeOf(val))
+
+						// data_list, ok := val.([]data)
+						// if !ok {
+						// 	fmt.Println("Error: Cannot convert received interface data to struct")
+						// 	rw.WriteHeader(http.StatusInternalServerError)
+						// 	return
+						// }
 
 						fmt.Println("data parsed")
 
 						writeServData := writeServPayload{
 							Shard:    k,
 							Curr_idx: 0,
-							Data:     data_list,
+							Data:     val.([]data),
 						}
 
 						fmt.Println(writeServData)
@@ -676,7 +691,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						// write failure handling
 					}
 
-					// ConHashList[shard].AddServer(rand.Intn(Mod), servName)
+					ConHashList[shard].AddServer(servID, servName)
 				}
 			}
 
@@ -1411,7 +1426,7 @@ func serverHeartbeat(shard_id string) (string, error) {
 			if _, ok := ServerList[name]; ok {
 				continue
 			}
-			err = addServerContainer(name, num, shard_list)
+			err = addServerContainer(name, num)
 			if err != nil {
 				mtx.Unlock()
 				return "", err
@@ -1444,7 +1459,7 @@ func serverHeartbeat(shard_id string) (string, error) {
 					return "", errors.New("Server failed")
 				}
 
-				var shard_data map[string]interface{}
+				shard_data := make(map[string]interface{})
 				err = json.NewDecoder(servResp.Body).Decode(&shard_data)
 				if err != nil {
 					mtx.Unlock()
@@ -1463,6 +1478,10 @@ func serverHeartbeat(shard_id string) (string, error) {
 
 				for k, v := range shard_data {
 					if k == "status" {
+						continue
+					}
+
+					if _, ok := v.(interface{}); ok { // val is empty
 						continue
 					}
 
@@ -1491,6 +1510,7 @@ func serverHeartbeat(shard_id string) (string, error) {
 					}
 					// write failure handling
 				}
+				ConHashList[shard].AddServer(num, name)
 			}
 
 			_, err = db.Exec("UPDATE MapT SET Server_id = ? WHERE Server_id = ?", name, servName)
@@ -1510,20 +1530,20 @@ func serverHeartbeat(shard_id string) (string, error) {
 }
 
 // Function to add a new server container
-func addServerContainer(serverName string, serverNumber int, shards []string) error {
-	// Add the server to the consistent hash ring
-	for _, shard := range shards {
-		ConHashList[shard].AddServer(serverNumber, serverName)
-	}
+func addServerContainer(serverName string, serverNumber int) error {
+	// // Add the server to the consistent hash ring
+	// for _, shard := range shards {
+	// 	ConHashList[shard].AddServer(serverNumber, serverName)
+	// }
 
 	// Docker API endpoint
 	endpoint := "unix:///var/run/docker.sock"
 	client, err := docker.NewClient(endpoint)
 	if err != nil {
 		// If adding server to the hash ring failed, remove it and return an error
-		for _, shard := range shards {
-			ConHashList[shard].RemoveServer(serverName)
-		}
+		// for _, shard := range shards {
+		// 	ConHashList[shard].RemoveServer(serverName)
+		// }
 		return err
 	}
 
@@ -1547,9 +1567,9 @@ func addServerContainer(serverName string, serverNumber int, shards []string) er
 	if err != nil {
 		fmt.Println("Container could not be created\n", err)
 		// If container creation fails, remove the server from the hash ring and return an error
-		for _, shard := range shards {
-			ConHashList[shard].RemoveServer(serverName)
-		}
+		// for _, shard := range shards {
+		// 	ConHashList[shard].RemoveServer(serverName)
+		// }
 		return err
 	}
 
@@ -1558,9 +1578,9 @@ func addServerContainer(serverName string, serverNumber int, shards []string) er
 	if err != nil {
 		fmt.Println("Container could not be started\n", err)
 		// If starting the container fails, remove the server from the hash ring and return an error
-		for _, shard := range shards {
-			ConHashList[shard].RemoveServer(serverName)
-		}
+		// for _, shard := range shards {
+		// 	ConHashList[shard].RemoveServer(serverName)
+		// }
 		return err
 	}
 
