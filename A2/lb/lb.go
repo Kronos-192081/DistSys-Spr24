@@ -157,9 +157,6 @@ var serv_schema schema
 
 var db *sql.DB
 
-// Mutex for thread-safe operations
-var mtx sync.Mutex
-
 // Main function
 func main() {
 	fmt.Println("Starting load balancer")
@@ -331,7 +328,7 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 			}
 			ServerList[servName] = true
 			println("server added : ", servName)
-			time.Sleep(1 * time.Second)
+			time.Sleep(2 * time.Second)
 			configServData := configPayload{
 				Schema: serv_schema,
 				Shards: shards,
@@ -344,13 +341,6 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 			println("payload generated")
-
-			servName, err = serverHeartbeat(servName)
-			if err != nil {
-				fmt.Println("Error:", err)
-				rw.WriteHeader(http.StatusInternalServerError)
-				return
-			}
 
 			url := "http://" + servName + ":5000"
 			servResp, err := http.Post(url+"/config", "application/json", bytes.NewReader(jsonBody))
@@ -513,7 +503,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 			for k, v := range payloadData.Servers {
 				var servName string
 				servID := rand.Intn(Mod)
-				time.Sleep(1 * time.Second)
+				time.Sleep(2 * time.Second)
 				if match, _ := regexp.MatchString("Server\\[[0-9]+\\]", k); match {
 					for {
 						num := rand.Intn(Mod)
@@ -545,7 +535,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 					server_names = append(server_names, k)
 					servName = k
 				}
-				time.Sleep(1 * time.Second)
+				time.Sleep(2 * time.Second)
 
 				for _, shard_id := range v {
 					_, err = db.Exec("INSERT INTO MapT (Shard_id, Server_id) VALUES (?, ?);", shard_id, servName)
@@ -562,13 +552,6 @@ func add(rw http.ResponseWriter, req *http.Request) {
 				}
 
 				jsonBody, err := json.Marshal(configServData)
-				if err != nil {
-					fmt.Println("Error:", err)
-					rw.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-
-				servName, err = serverHeartbeat(servName)
 				if err != nil {
 					fmt.Println("Error:", err)
 					rw.WriteHeader(http.StatusInternalServerError)
@@ -633,7 +616,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						return
 					}
 
-					shard_data := make(map[string]interface{})
+					shard_data := make(map[string][]data)
 
 					err = json.NewDecoder(servResp.Body).Decode(&shard_data)
 					if err != nil {
@@ -642,44 +625,50 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						return
 					}
 
-					if _, ok := shard_data["status"]; !ok {
-						fmt.Println("Error: Server failed")
-						rw.WriteHeader(http.StatusInternalServerError)
-						return
-					}
+					// if _, ok := shard_data["status"]; !ok {
+					// 	fmt.Println("Error: Server failed")
+					// 	rw.WriteHeader(http.StatusInternalServerError)
+					// 	return
+					// }
 
-					if shard_data["status"] != "success" {
-						fmt.Println("Error: Server failed")
-						rw.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-
+					// if shard_data["status"] != "success" {
+					// 	fmt.Println("Error: Server failed")
+					// 	rw.WriteHeader(http.StatusInternalServerError)
+					// 	return
+					// }
+					fmt.Println(shard_data)
 					for k, val := range shard_data {
-						if k == "status" {
-							continue
-						}
+						// if k == "status" {
+						// 	continue
+						// }
 
-						if _, ok := val.(interface{}); ok { // val is empty
-							continue
-						}
+						// if _, ok := val.(interface{}); ok { // val is empty
+						// 	continue
+						// }
 
 						// fmt.Println(val)
 						// fmt.Println(reflect.TypeOf(val))
 
+						if len(val) == 0 {
+							continue
+						}
+
 						// data_list, ok := val.([]data)
 						// if !ok {
-						// 	fmt.Println("Error: Cannot convert received interface data to struct")
-						// 	rw.WriteHeader(http.StatusInternalServerError)
-						// 	return
+						// 	// fmt.Println("Error: Cannot convert received interface data to struct")
+						// 	// rw.WriteHeader(http.StatusInternalServerError)
+						// 	// return
+						// 	continue
 						// }
+						// fmt.Println(data_list)
 
 						writeServData := writeServPayload{
 							Shard:    k,
 							Curr_idx: 0,
-							Data:     val.([]data),
+							Data:     val,
 						}
 
-						fmt.Println(writeServData)
+						// fmt.Println(writeServData)
 
 						jsonBody, err := json.Marshal(writeServData)
 						if err != nil {
@@ -1063,6 +1052,10 @@ func write(rw http.ResponseWriter, req *http.Request) {
 			curr_idx := -1
 			for _, servName := range servNameList {
 				// fmt.Println(shard, valid_idx_dict[shard], data_list)
+				if len(data_list) == 0 {
+					continue
+				}
+
 				writeServData := writeServPayload{
 					Shard:    shard,
 					Curr_idx: valid_idx_dict[shard],
@@ -1082,7 +1075,7 @@ func write(rw http.ResponseWriter, req *http.Request) {
 					rw.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-				
+
 				url := "http://" + servName + ":5000"
 				servResp, err := http.Post(url+"/write", "application/json", bytes.NewReader(jsonBody))
 				if err != nil {
@@ -1417,6 +1410,7 @@ func serverHeartbeat(ServName string) (string, error) {
 	rand.NewSource(time.Now().UnixNano())
 	max_tries := 10000
 	servName := ServName
+	var mtx sync.Mutex
 
 	// Attempt to find a reachable server within a limit
 	for max_tries != 0 {
@@ -1454,9 +1448,10 @@ func serverHeartbeat(ServName string) (string, error) {
 				return "", errors.New("Inactive server deletion failed")
 			}
 		}
-
+		fmt.Println("server removed from conhash")
 		// Retry until a new server is successly added
 		for {
+			fmt.Println("new itr")
 			num := rand.Intn(Mod)
 			name := GenerateRandomString(num)
 			if _, ok := ServerList[name]; ok {
@@ -1467,11 +1462,36 @@ func serverHeartbeat(ServName string) (string, error) {
 				mtx.Unlock()
 				return "", err
 			}
+			time.Sleep(2 * time.Second)
+			fmt.Println("serv spawned ", name)
 
-			servName = name
+			configServData := configPayload{
+				Schema: serv_schema,
+				Shards: shard_list,
+			}
+
+			jsonBody, err := json.Marshal(configServData)
+			if err != nil {
+				mtx.Unlock()
+				return "", err
+			}
+
+			url := "http://" + name + ":5000"
+			servResp, err := http.Post(url+"/config", "application/json", bytes.NewReader(jsonBody))
+			if err != nil {
+				mtx.Unlock()
+				return "", err
+			}
+			if servResp.StatusCode != http.StatusOK {
+				mtx.Unlock()
+				return "", err
+			}
+
+			// servName = name
 
 			// new server updated
 			for _, shard := range shard_list {
+				fmt.Println("shard processing ==> ", shard)
 
 				// copy from old data
 				copyServData := copyPayload{
@@ -1490,6 +1510,7 @@ func serverHeartbeat(ServName string) (string, error) {
 					mtx.Unlock()
 					return "", err
 				}
+				fmt.Println("copying from ", oldServName)
 				url := "http://" + oldServName + ":5000"
 				servResp, err := http.Post(url+"/copy", "application/json", bytes.NewReader(jsonBody))
 				if err != nil {
@@ -1501,36 +1522,40 @@ func serverHeartbeat(ServName string) (string, error) {
 					return "", errors.New("Server failed")
 				}
 
-				shard_data := make(map[string]interface{})
+				shard_data := make(map[string][]data)
 				err = json.NewDecoder(servResp.Body).Decode(&shard_data)
 				if err != nil {
 					mtx.Unlock()
 					return "", err
 				}
-
-				if _, ok := shard_data["status"]; !ok {
-					mtx.Unlock()
-					return "", errors.New("Server failed")
-				}
-
-				if shard_data["status"] != "success" {
-					mtx.Unlock()
-					return "", errors.New("Server failed")
-				}
+				fmt.Println(shard_data)
 
 				for k, v := range shard_data {
-					if k == "status" {
-						continue
-					}
 
-					if _, ok := v.(interface{}); ok { // val is empty
+					// if _, ok := v.(interface{}); ok { // val is empty
+					// 	continue
+					// }
+
+					// fmt.Println(v)
+					// fmt.Println(reflect.TypeOf(v))
+
+					// data_list, ok := v.([]data)
+					// if !ok {
+					// 	// fmt.Println("Error: Cannot convert received interface data to struct")
+					// 	// rw.WriteHeader(http.StatusInternalServerError)
+					// 	// return
+					// 	continue
+					// }
+					// fmt.Println(data_list)
+
+					if len(v) == 0 {
 						continue
 					}
 
 					writeServData := writeServPayload{
 						Shard:    k,
 						Curr_idx: 0,
-						Data:     v.([]data),
+						Data:     v,
 					}
 
 					jsonBody, err := json.Marshal(writeServData)
@@ -1539,7 +1564,6 @@ func serverHeartbeat(ServName string) (string, error) {
 						return "", err
 					}
 
-					// heartbeat required maybe
 					url = "http://" + name + ":5000"
 					servResp, err = http.Post(url+"/write", "application/json", bytes.NewReader(jsonBody))
 					if err != nil {
@@ -1561,9 +1585,10 @@ func serverHeartbeat(ServName string) (string, error) {
 				return "", err
 			}
 			ServerList[name] = true
-
+			servName = name
 			break
 		}
+		fmt.Println("in out loop")
 
 		mtx.Unlock()
 		max_tries--
@@ -1627,7 +1652,7 @@ func addServerContainer(serverName string, serverNumber int) error {
 	}
 
 	// Allow some time for the container to start
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 	return nil
 }
 
@@ -1654,7 +1679,7 @@ func killServerContainer(serverName string, shards []string) error {
 	}
 
 	// Allow some time for the container to stop
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 	return nil
 }
 

@@ -142,9 +142,7 @@ func copyHandler(w http.ResponseWriter, r *http.Request) {
 		final_result[copyReq.Shards[i]] = result
 	}
 
-	response := map[string]interface{}{
-		"status": "success",
-	}
+	response := make(map[string][]Row)
 
 	for i := 0; i < len(copyReq.Shards); i++ {
 		response[copyReq.Shards[i]] = final_result[copyReq.Shards[i]]

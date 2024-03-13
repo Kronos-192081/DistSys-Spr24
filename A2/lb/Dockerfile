@@ -2,6 +2,7 @@
 
 FROM golang:latest AS build
 # RUN apt update && apt install -y docker.io
+RUN apt install -y curl
 WORKDIR /lb
 # COPY lb.go ./
 # COPY conhash ./conhash
