@@ -345,7 +345,13 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 			}
 			println("payload generated")
 
-			// heartbeat required
+			servName, err = serverHeartbeat(servName)
+			if err != nil {
+				fmt.Println("Error:", err)
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
 			url := "http://" + servName + ":5000"
 			servResp, err := http.Post(url+"/config", "application/json", bytes.NewReader(jsonBody))
 			println("data received")
@@ -562,7 +568,13 @@ func add(rw http.ResponseWriter, req *http.Request) {
 					return
 				}
 
-				// heartbeat required
+				servName, err = serverHeartbeat(servName)
+				if err != nil {
+					fmt.Println("Error:", err)
+					rw.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+
 				url := "http://" + servName + ":5000"
 				servResp, err := http.Post(url+"/config", "application/json", bytes.NewReader(jsonBody))
 				if err != nil {
@@ -601,8 +613,13 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						return
 					}
 
-					// heartbeat required
 					oldServName := GetServerName(shard)
+					oldServName, err = serverHeartbeat(oldServName)
+					if err != nil {
+						fmt.Println("Error:", err)
+						rw.WriteHeader(http.StatusInternalServerError)
+						return
+					}
 					url := "http://" + oldServName + ":5000"
 					servResp, err := http.Post(url+"/copy", "application/json", bytes.NewReader(jsonBody))
 					if err != nil {
@@ -637,8 +654,6 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						return
 					}
 
-					fmt.Println("checks done")
-
 					for k, val := range shard_data {
 						if k == "status" {
 							continue
@@ -658,8 +673,6 @@ func add(rw http.ResponseWriter, req *http.Request) {
 						// 	return
 						// }
 
-						fmt.Println("data parsed")
-
 						writeServData := writeServPayload{
 							Shard:    k,
 							Curr_idx: 0,
@@ -675,7 +688,6 @@ func add(rw http.ResponseWriter, req *http.Request) {
 							return
 						}
 
-						// heartbeat required maybe
 						url = "http://" + servName + ":5000"
 						servResp, err = http.Post(url+"/write", "application/json", bytes.NewReader(jsonBody))
 						if err != nil {
@@ -914,8 +926,6 @@ func read(rw http.ResponseWriter, req *http.Request) {
 
 		data_entries := []data{}
 		for i, shard := range shard_ids {
-			// heartbeat required
-			servName := GetServerName(shard)
 
 			readServData := readServPayload{
 				Shard:   shard,
@@ -928,7 +938,15 @@ func read(rw http.ResponseWriter, req *http.Request) {
 				rw.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			// heartbeat required maybe
+
+			servName := GetServerName(shard)
+			servName, err = serverHeartbeat(servName)
+			if err != nil {
+				fmt.Println("Error:", err)
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
 			url := "http://" + servName + ":5000"
 			servResp, err := http.Post(url+"/read", "application/json", bytes.NewReader(jsonBody))
 			if err != nil {
@@ -1058,7 +1076,13 @@ func write(rw http.ResponseWriter, req *http.Request) {
 					return
 				}
 
-				// heartbeat required
+				servName, err = serverHeartbeat(servName)
+				if err != nil {
+					fmt.Println("Error:", err)
+					rw.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				
 				url := "http://" + servName + ":5000"
 				servResp, err := http.Post(url+"/write", "application/json", bytes.NewReader(jsonBody))
 				if err != nil {
@@ -1190,7 +1214,13 @@ func update(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			// heartbeat required
+			servName, err = serverHeartbeat(servName)
+			if err != nil {
+				fmt.Println("Error:", err)
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
 			url := "http://" + servName + ":5000"
 			servResp, err := http.Post(url+"/update", "application/json", bytes.NewReader(jsonBody))
 			if err != nil {
@@ -1314,7 +1344,13 @@ func del(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			// heartbeat required
+			servName, err = serverHeartbeat(servName)
+			if err != nil {
+				fmt.Println("Error:", err)
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
 			url := "http://" + servName + ":5000"
 			servResp, err := http.Post(url+"/del", "application/json", bytes.NewReader(jsonBody))
 			if err != nil {
@@ -1377,19 +1413,19 @@ func GetServerName(shard string) string {
 }
 
 // Function to perform server heartbeat and return a reachable server URL
-func serverHeartbeat(shard_id string) (string, error) {
+func serverHeartbeat(ServName string) (string, error) {
 	rand.NewSource(time.Now().UnixNano())
 	max_tries := 10000
+	servName := ServName
 
 	// Attempt to find a reachable server within a limit
 	for max_tries != 0 {
 		mtx.Lock()
-		servName := GetServerName(shard_id)
 		url := "http://" + servName + ":5000"
 		servResp, err := http.Get(url + "/heartbeat")
 		if err == nil && servResp.StatusCode == http.StatusOK {
 			mtx.Unlock()
-			return url, nil
+			return servName, nil
 		}
 
 		delete(ServerList, servName)
@@ -1432,6 +1468,8 @@ func serverHeartbeat(shard_id string) (string, error) {
 				return "", err
 			}
 
+			servName = name
+
 			// new server updated
 			for _, shard := range shard_list {
 
@@ -1446,8 +1484,12 @@ func serverHeartbeat(shard_id string) (string, error) {
 					return "", err
 				}
 
-				// heartbeat required
 				oldServName := GetServerName(shard)
+				oldServName, err = serverHeartbeat(oldServName)
+				if err != nil {
+					mtx.Unlock()
+					return "", err
+				}
 				url := "http://" + oldServName + ":5000"
 				servResp, err := http.Post(url+"/copy", "application/json", bytes.NewReader(jsonBody))
 				if err != nil {
