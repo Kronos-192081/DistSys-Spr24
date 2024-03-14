@@ -1,6 +1,6 @@
 # <div align="center">Scalable Sharded Database</div>
 
-> Assignment 1 of Distributed Systems course (CS60002) offered in Spring semester 2024, Department of CSE, IIT Kharagpur.
+> Assignment 2 of Distributed Systems course (CS60002) offered in Spring semester 2024, Department of CSE, IIT Kharagpur.
 
 <!-- PROJECT LOGO -->
 <div align="center">
