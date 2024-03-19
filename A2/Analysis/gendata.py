@@ -19,9 +19,9 @@ def gen_data(n, lower, upper):
                 name = get_rand_name()
                 marks = random.randint(0, 100)
                 entry = {}
-                entry['id'] = r
-                entry['name'] = name
-                entry['marks'] = marks
+                entry['Stud_id'] = r
+                entry['Stud_name'] = name
+                entry['Stud_marks'] = marks
                 data.append(entry)
                 break
     return data

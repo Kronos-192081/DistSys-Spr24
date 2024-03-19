@@ -20,7 +20,8 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
+	// _ "github.com/mattn/go-sqlite3"
 )
 
 // Structs for representing JSON responses and payloads
@@ -161,25 +162,27 @@ var db *sql.DB
 func main() {
 	fmt.Println("Starting load balancer")
 
-	d, err := sql.Open("sqlite3", "lb.db")
+	// d, err := sql.Open("sqlite3", "lb.db")
+	const (
+		host     = "localhost"
+		port     = 5432
+		user     = "postgres"
+		password = "20CS30061"
+		dbname   = "testdb"
+	)
+
+	// Construct connection string
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
+	// Connect to database
+	d, err := sql.Open("postgres", connStr)
+
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 	db = d
-	defer db.Close()
-
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS ShardT (Stud_id_low INTEGER PRIMARY KEY, Shard_id TEXT, Shard_size INTEGER, valid_idx INTEGER)")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS MapT (Shard_id TEXT, Server_id TEXT)")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	// defer db.Close()
 
 	// Seed for randomization
 	rand.NewSource(time.Now().UnixNano())
@@ -290,6 +293,21 @@ func main() {
 
 // Handler for /init endpoint (POST)
 func init_(rw http.ResponseWriter, req *http.Request) {
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS ShardT (Stud_id_low INTEGER PRIMARY KEY, Shard_id TEXT, Shard_size INTEGER, valid_idx INTEGER)")
+	if err != nil {
+		fmt.Println(err)
+		return
+	} else {
+		fmt.Println("ShardT created")
+	}
+
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS MapT (Shard_id TEXT, Server_id TEXT)")
+	if err != nil {
+		fmt.Println(err)
+		return
+	} else {
+		fmt.Println("MapT created")
+	}
 	switch req.Method {
 	case http.MethodPost:
 		var payloadData initPayload
@@ -303,7 +321,7 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 		serv_schema = payloadData.Schema
 
 		for _, shard := range payloadData.Shards {
-			_, err := db.Exec("INSERT INTO ShardT (Stud_id_low, Shard_id, Shard_size, valid_idx) VALUES (?, ?, ?, ?)", shard.Stud_id_low, shard.Shard_id, shard.Shard_size, 0)
+			_, err := db.Exec("INSERT INTO ShardT (Stud_id_low, Shard_id, Shard_size, valid_idx) VALUES ($1, $2, $3, $4)", shard.Stud_id_low, shard.Shard_id, shard.Shard_size, 0)
 			println("db insert done : ", shard.Shard_id)
 			if err != nil {
 				fmt.Println("Error:", err)
@@ -357,7 +375,7 @@ func init_(rw http.ResponseWriter, req *http.Request) {
 			}
 
 			for _, shard := range shards {
-				_, err = db.Exec("INSERT INTO MapT (Shard_id, Server_id) VALUES (?, ?)", shard, servName)
+				_, err = db.Exec("INSERT INTO MapT (Shard_id, Server_id) VALUES ($1, $2)", shard, servName)
 				if err != nil {
 					fmt.Println("Error:", err)
 					rw.WriteHeader(http.StatusInternalServerError)
@@ -412,7 +430,7 @@ func status(rw http.ResponseWriter, req *http.Request) {
 
 		server_dict := map[string][]string{}
 		for servName, _ := range ServerList {
-			rows, err := db.Query("SELECT Shard_id FROM MapT WHERE Server_id = ?", servName)
+			rows, err := db.Query("SELECT Shard_id FROM MapT WHERE Server_id = $1", servName)
 			if err != nil {
 				fmt.Println("Error:", err)
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -491,7 +509,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 			server_names := []string{}
 
 			for _, shard := range payloadData.New_shards {
-				_, err := db.Exec("INSERT INTO ShardT (Stud_id_low, Shard_id, Shard_size, valid_idx) VALUES (?, ?, ?, ?)", shard.Stud_id_low, shard.Shard_id, shard.Shard_size, 0)
+				_, err := db.Exec("INSERT INTO ShardT (Stud_id_low, Shard_id, Shard_size, valid_idx) VALUES ($1, $2, $3, $4)", shard.Stud_id_low, shard.Shard_id, shard.Shard_size, 0)
 				if err != nil {
 					fmt.Println("Error:", err)
 					rw.WriteHeader(http.StatusInternalServerError)
@@ -538,7 +556,7 @@ func add(rw http.ResponseWriter, req *http.Request) {
 				time.Sleep(2 * time.Second)
 
 				for _, shard_id := range v {
-					_, err = db.Exec("INSERT INTO MapT (Shard_id, Server_id) VALUES (?, ?);", shard_id, servName)
+					_, err = db.Exec("INSERT INTO MapT (Shard_id, Server_id) VALUES ($1, $2);", shard_id, servName)
 					if err != nil {
 						fmt.Println("Error:", err)
 						rw.WriteHeader(http.StatusInternalServerError)
@@ -751,7 +769,7 @@ func rm(rw http.ResponseWriter, req *http.Request) {
 			server_names := []string{}
 			// Remove specified server containers
 			for _, servName := range payloadData.Servers {
-				rows, err := db.Query("SELECT Shard_id FROM MapT WHERE Server_id = ?", servName)
+				rows, err := db.Query("SELECT Shard_id FROM MapT WHERE Server_id = $1", servName)
 				if err != nil {
 					fmt.Println("Error:", err)
 					rw.WriteHeader(http.StatusInternalServerError)
@@ -776,7 +794,7 @@ func rm(rw http.ResponseWriter, req *http.Request) {
 					return
 				}
 
-				_, err = db.Exec("DELETE FROM MapT WHERE Server_id = ?", servName)
+				_, err = db.Exec("DELETE FROM MapT WHERE Server_id = $1", servName)
 				if err != nil {
 					fmt.Println("Error:", err)
 					rw.WriteHeader(http.StatusInternalServerError)
@@ -801,7 +819,7 @@ func rm(rw http.ResponseWriter, req *http.Request) {
 
 			// Remove the extra servers
 			for i := 0; i < extraServ; i++ {
-				rows, err := db.Query("SELECT Shard_id FROM MapT WHERE Server_id = ?", curServNames[i])
+				rows, err := db.Query("SELECT Shard_id FROM MapT WHERE Server_id = $1", curServNames[i])
 				if err != nil {
 					fmt.Println("Error:", err)
 					rw.WriteHeader(http.StatusInternalServerError)
@@ -826,7 +844,7 @@ func rm(rw http.ResponseWriter, req *http.Request) {
 					return
 				}
 
-				_, err = db.Exec("DELETE FROM MapT WHERE Server_id = ?", curServNames[i])
+				_, err = db.Exec("DELETE FROM MapT WHERE Server_id = $1", curServNames[i])
 				if err != nil {
 					fmt.Println("Error:", err)
 					rw.WriteHeader(http.StatusInternalServerError)
@@ -888,7 +906,7 @@ func read(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		// Range parsing and obtaining shard id list
-		rows, err := db.Query("SELECT Shard_id, Stud_id_low, Shard_size FROM ShardT WHERE Stud_id_low + Shard_size - 1 >= ? AND Stud_id_low <= ?;", payloadData.Stud_id.Low, payloadData.Stud_id.High)
+		rows, err := db.Query("SELECT Shard_id, Stud_id_low, Shard_size FROM ShardT WHERE Stud_id_low + Shard_size - 1 >= $1 AND Stud_id_low <= $2;", payloadData.Stud_id.Low, payloadData.Stud_id.High)
 		if err != nil {
 			fmt.Println("Error:", err)
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -999,7 +1017,7 @@ func write(rw http.ResponseWriter, req *http.Request) {
 		valid_idx_dict := make(map[string]int)
 		for _, data_entry := range payloadData.Data {
 			// fmt.Println(data_entry)
-			rows, err := db.Query("SELECT Shard_id, valid_idx FROM ShardT WHERE ? BETWEEN Stud_id_low AND (Stud_id_low + Shard_size);", data_entry.Stud_id)
+			rows, err := db.Query("SELECT Shard_id, valid_idx FROM ShardT WHERE $1 BETWEEN Stud_id_low AND (Stud_id_low + Shard_size - 1);", data_entry.Stud_id)
 			// fmt.Println(rows)
 			if err != nil {
 				fmt.Println("Error:", err)
@@ -1030,7 +1048,7 @@ func write(rw http.ResponseWriter, req *http.Request) {
 		for shard, data_list := range data_entries {
 			// fmt.Println(shard, data_list)
 			servNameList := []string{}
-			rows, err := db.Query("SELECT Server_id FROM MapT WHERE Shard_id = ?;", shard)
+			rows, err := db.Query("SELECT Server_id FROM MapT WHERE Shard_id = $1;", shard)
 			if err != nil {
 				fmt.Println("Error:", err)
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -1104,7 +1122,7 @@ func write(rw http.ResponseWriter, req *http.Request) {
 				curr_idx = writeServResp.Curr_idx
 			}
 			if !failed && curr_idx != -1 {
-				_, err = db.Exec("UPDATE ShardT SET valid_idx = ? WHERE Shard_id = ?", curr_idx, shard)
+				_, err = db.Exec("UPDATE ShardT SET valid_idx = $1 WHERE Shard_id = $2", curr_idx, shard)
 				if err != nil {
 					fmt.Println("Error:", err)
 					rw.WriteHeader(http.StatusInternalServerError)
@@ -1150,7 +1168,7 @@ func update(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		var shard_id string
-		rows, err := db.Query("SELECT Shard_id FROM ShardT WHERE Stud_id_low <= ? AND Stud_id_low + Shard_size > ?", payloadData.Stud_id, payloadData.Stud_id)
+		rows, err := db.Query("SELECT Shard_id FROM ShardT WHERE Stud_id_low <= $1 AND Stud_id_low + Shard_size > $2", payloadData.Stud_id, payloadData.Stud_id)
 		if err != nil {
 			fmt.Println("Error:", err)
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -1173,7 +1191,7 @@ func update(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		servNameList := []string{}
-		rows, err = db.Query("SELECT Server_id FROM MapT WHERE Shard_id = ?", shard_id)
+		rows, err = db.Query("SELECT Server_id FROM MapT WHERE Shard_id = $1", shard_id)
 		if err != nil {
 			fmt.Println("Error:", err)
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -1281,7 +1299,7 @@ func del(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		var shard_id string
-		rows, err := db.Query("SELECT Shard_id FROM ShardT WHERE Stud_id_low <= ? AND Stud_id_low + Shard_size > ?", payloadData.Stud_id, payloadData.Stud_id)
+		rows, err := db.Query("SELECT Shard_id FROM ShardT WHERE Stud_id_low <= $1 AND Stud_id_low + Shard_size > $2", payloadData.Stud_id, payloadData.Stud_id)
 		if err != nil {
 			fmt.Println("Error:", err)
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -1304,7 +1322,7 @@ func del(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		servNameList := []string{}
-		rows, err = db.Query("SELECT Server_id FROM MapT WHERE Shard_id = ?", shard_id)
+		rows, err = db.Query("SELECT Server_id FROM MapT WHERE Shard_id = $1", shard_id)
 		if err != nil {
 			fmt.Println("Error:", err)
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -1425,7 +1443,7 @@ func serverHeartbeat(ServName string) (string, error) {
 		delete(ServerList, servName)
 
 		shard_list := []string{}
-		rows, err := db.Query("SELECT Shard_id FROM MapT WHERE Server_id = ?", servName)
+		rows, err := db.Query("SELECT Shard_id FROM MapT WHERE Server_id = $1", servName)
 		if err != nil {
 			mtx.Unlock()
 			return "", err
@@ -1579,7 +1597,7 @@ func serverHeartbeat(ServName string) (string, error) {
 				ConHashList[shard].AddServer(num, name)
 			}
 
-			_, err = db.Exec("UPDATE MapT SET Server_id = ? WHERE Server_id = ?", name, servName)
+			_, err = db.Exec("UPDATE MapT SET Server_id = $1 WHERE Server_id = $2", name, servName)
 			if err != nil {
 				mtx.Unlock()
 				return "", err

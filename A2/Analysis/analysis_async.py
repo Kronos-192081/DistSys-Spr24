@@ -8,19 +8,21 @@ import aiohttp
 async def req(s, d, op):
     if op == 'w':
         write_payload = {"data" : [d]}
-        write_json = json.dumps(write_payload)
+        write_json = write_payload
         async with s.post(f'http://localhost:5000/write', json=write_json) as r:
             if r.status != 200:
                 r.raise_for_status()
+            # print(await r.text())
             return await r.text()
     elif op == 'r':
         read_payload = {
-            "Stud_id" : {"low" : d["id"], "high" : d["id"]}
+            "Stud_id" : {"low" : d["Stud_id"], "high" : d["Stud_id"]}
         }
-        read_json = json.dumps(read_payload)
+        read_json = read_payload
         async with s.post("http://localhost:5000/read", json=read_json) as r:
             if r.status != 200:
                 r.raise_for_status()
+            # print(await r.text())
             return await r.text()
 
 async def req_all(s, data, op):
@@ -31,30 +33,24 @@ async def req_all(s, data, op):
     res = await asyncio.gather(*tasks)
     return res
     
-async def rw_check(init_payload):
-    f = open("data.json", "r")
-    data = json.load(f)
-    f.close()
-
-    init_json = json.dumps(init_payload)
-    res = re.post("http://localhost:5000/init", json=init_json)
-    if res.status_code != 200:
-        res.raise_for_status()
+async def rw_check(data):
 
     start = perf_counter()
     async with aiohttp.ClientSession() as session:
         await req_all(session, data, 'w')
     stop = perf_counter()
-    print("\nWrite Time: {0:5.2f} seconds\nWrite Speed : {0:5.2f} writes per second\n".format(stop - start, len(data) / (stop - start)))
+    print("\nWrite Time: {0:5.2f} seconds\nWrite Speed : {1:5.2f} writes per second\n".format(stop - start, len(data) / (stop - start)))
     
     start = perf_counter()
     async with aiohttp.ClientSession() as session:
         await req_all(session, data, 'r')
     stop = perf_counter()
-    print("\nRead Time: {0:5.2f} seconds\nRead Speed : {0:5.2f} reads per second\n".format(stop - start, len(data) / (stop - start)))
+    print("\nRead Time: {0:5.2f} seconds\nRead Speed : {1:5.2f} reads per second\n".format(stop - start, len(data) / (stop - start)))
     
-async def main():
-    headers = {'Content-Type': 'application/json'}
+def main():
+    f = open("data.json", "r")
+    data = json.load(f)
+    f.close()
     print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
     print("This test is performed with 3 shard replicas.\n")
     init_payload = {
@@ -67,7 +63,18 @@ async def main():
                      "Server1" : ["sh2", "sh3"],
                      "Server2" : ["sh1", "sh3"]}
     }
-    await rw_check(init_payload)
+    # init_json = json.dumps(init_payload)
+    res = re.post("http://localhost:5000/init", json=init_payload)
+    if res.status_code != 200:
+        res.raise_for_status()
+
+    print("Init completed successfully")
+
+    start = perf_counter()
+    asyncio.run(rw_check(data))
+    stop = perf_counter()
+    print("Analysis completed in {0:5.2f} seconds\n".format(stop - start))
+
 '''
     print("Test 2: Sending 10000 write requests followed by 10000 read requests...")
     print("This test is performed with 7 shard replicas.\n")
@@ -87,7 +94,4 @@ async def main():
     
 
 if __name__ == '__main__':
-    start = perf_counter()
-    asyncio.run(main())
-    stop = perf_counter()
-    print("Analysis completed in {0:5.2f} seconds\n".format(stop - start))
+    main()
