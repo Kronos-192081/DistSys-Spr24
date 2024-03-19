@@ -888,7 +888,7 @@ func read(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		// Range parsing and obtaining shard id list
-		rows, err := db.Query("SELECT Shard_id, Stud_id_low, Shard_size FROM ShardT WHERE Stud_id_low >= ? AND Stud_id_low <= ?;", payloadData.Stud_id.Low, payloadData.Stud_id.High)
+		rows, err := db.Query("SELECT Shard_id, Stud_id_low, Shard_size FROM ShardT WHERE Stud_id_low + Shard_size - 1 >= ? AND Stud_id_low <= ?;", payloadData.Stud_id.Low, payloadData.Stud_id.High)
 		if err != nil {
 			fmt.Println("Error:", err)
 			rw.WriteHeader(http.StatusInternalServerError)
