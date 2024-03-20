@@ -1,7 +1,7 @@
 import asyncio
 from time import perf_counter
 import json
-import requests as re
+import requests as rq
 
 import aiohttp
 
@@ -48,50 +48,114 @@ async def rw_check(data):
     print("\nRead Time: {0:5.2f} seconds\nRead Speed : {1:5.2f} reads per second\n".format(stop - start, len(data) / (stop - start)))
     
 def main():
-    f = open("data.json", "r")
-    data = json.load(f)
-    f.close()
-    print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
-    print("This test is performed with 3 shard replicas.\n")
-    init_payload = {
-        "N": 3,
-        "schema": {"columns" : ["Stud_id", "Stud_name", "Stud_marks"], "dtypes" : ["Number", "String", "Number"]},
-        "shards" : [{"Stud_id_low" : 0, "Shard_id" : "sh1", "Shard_size" : 4096},
-                    {"Stud_id_low" : 4096, "Shard_id" : "sh2", "Shard_size" : 4096},
-                    {"Stud_id_low" : 8192, "Shard_id" : "sh3", "Shard_size" : 4096}],
-        "servers" : {"Server0" : ["sh1", "sh2"],
-                     "Server1" : ["sh2", "sh3"],
-                     "Server2" : ["sh1", "sh3"]}
-    }
-    # init_json = json.dumps(init_payload)
-    res = re.post("http://localhost:5000/init", json=init_payload)
-    if res.status_code != 200:
-        res.raise_for_status()
+    print("Enter test no. :")
+    test_no = int(input())
+    match test_no:
+        case 1:
+            f = open("data.json", "r")
+            data = json.load(f)
+            f.close()
+            print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
+            print("This test is performed with 3 shard replicas.\n")
+            init_payload = {
+                "N":6,
+                "schema":{"columns":["Stud_id","Stud_name","Stud_marks"], "dtypes":["Number","String","String"]},
+                "shards":[
+                    {"Stud_id_low":0, "Shard_id": "sh1", "Shard_size":4096},
+                    {"Stud_id_low":4096, "Shard_id": "sh2", "Shard_size":4096},
+                    {"Stud_id_low":8192, "Shard_id": "sh3", "Shard_size":4096},
+                    {"Stud_id_low":12288, "Shard_id": "sh4", "Shard_size":4096}],
+                "servers":{
+                    "Server0":["sh1","sh2"],
+                    "Server1":["sh3","sh4"],
+                    "Server3":["sh1","sh3"],
+                    "Server4":["sh4","sh2"],
+                    "Server5":["sh1","sh4"],
+                    "Server6":["sh3","sh2"]}
+            }
+            res = rq.post("http://localhost:5000/init", json=init_payload)
+            if res.status_code != 200:
+                res.raise_for_status()
 
-    print("Init completed successfully")
+            print("Init completed successfully")
 
-    start = perf_counter()
-    asyncio.run(rw_check(data))
-    stop = perf_counter()
-    print("Analysis completed in {0:5.2f} seconds\n".format(stop - start))
+            start = perf_counter()
+            asyncio.run(rw_check(data))
+            stop = perf_counter()
+            print("Analysis completed in {0:5.2f} seconds\n".format(stop - start))
+        case 2:
+            f = open("data.json", "r")
+            data = json.load(f)
+            f.close()
+            print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
+            print("This test is performed with 3 shard replicas.\n")
+            init_payload = {
+                "N":7,
+                "schema":{"columns":["Stud_id","Stud_name","Stud_marks"], "dtypes":["Number","String","String"]},
+                "shards":[
+                    {"Stud_id_low":0, "Shard_id": "sh1", "Shard_size":4096},
+                    {"Stud_id_low":4096, "Shard_id": "sh2", "Shard_size":4096},
+                    {"Stud_id_low":8192, "Shard_id": "sh3", "Shard_size":4096},
+                    {"Stud_id_low":12288, "Shard_id": "sh4", "Shard_size":4096}],
+                "servers":{
+                    "Server0":["sh1","sh2","sh3","sh4"],
+                    "Server1":["sh1","sh2","sh3","sh4"],
+                    "Server2":["sh1","sh2","sh3","sh4"],
+                    "Server3":["sh1","sh2","sh3","sh4"],
+                    "Server4":["sh1","sh2","sh3","sh4"],
+                    "Server5":["sh1","sh2","sh3","sh4"],
+                    "Server6":["sh1","sh2","sh3","sh4"]}
+            }
+            res = rq.post("http://localhost:5000/init", json=init_payload)
+            if res.status_code != 200:
+                res.raise_for_status()
 
-'''
-    print("Test 2: Sending 10000 write requests followed by 10000 read requests...")
-    print("This test is performed with 7 shard replicas.\n")
-    init_payload = {
-        "N": 3,
-        "schema": {"columns" : ["Stud_id", "Stud_name", "Stud_marks"], "dtypes" : ["Number", "String", "Number"]},
-        "shards" : [{"Stud_id_low" : 0, "Shard_id" : "sh1", "Shard_size" : 4096},
-                    {"Stud_id_low" : 4096, "Shard_id" : "sh2", "Shard_size" : 4096},
-                    {"Stud_id_low" : 8192, "Shard_id" : "sh3", "Shard_size" : 4096}],
-        "servers" : {"Server0" : ["sh1", "sh2"],
-                     "Server1" : ["sh2", "sh3"],
-                     "Server2" : ["sh1", "sh3"]}
-    }
-    await rw_check(init_payload)
-'''
-    
-    
+            print("Init completed successfully")
+
+            start = perf_counter()
+            asyncio.run(rw_check(data))
+            stop = perf_counter()
+            print("Analysis completed in {0:5.2f} seconds\n".format(stop - start))
+        case 3:
+            f = open("data.json", "r")
+            data = json.load(f)
+            f.close()
+            print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
+            print("This test is performed with 3 shard replicas.\n")
+            init_payload = {
+                "N":10,
+                "schema":{"columns":["Stud_id","Stud_name","Stud_marks"], "dtypes":["Number","String","String"]},
+                "shards":[
+                    {"Stud_id_low":0, "Shard_id": "sh1", "Shard_size":4096},
+                    {"Stud_id_low":4096, "Shard_id": "sh2", "Shard_size":4096},
+                    {"Stud_id_low":8192, "Shard_id": "sh3", "Shard_size":4096},
+                    {"Stud_id_low":12288, "Shard_id": "sh4", "Shard_size":4096},
+                    {"Stud_id_low":16384, "Shard_id": "sh4", "Shard_size":4096},
+                    {"Stud_id_low":20480, "Shard_id": "sh4", "Shard_size":4096}],
+                "servers":{
+                    "Server0":["sh1","sh2","sh3","sh4","sh6"],
+                    "Server1":["sh1","sh2","sh3","sh4","sh6"],
+                    "Server2":["sh1","sh2","sh3","sh5","sh6"],
+                    "Server3":["sh1","sh2","sh3","sh5","sh6"],
+                    "Server4":["sh1","sh2","sh4","sh5","sh6"],
+                    "Server5":["sh1","sh2","sh4","sh5","sh6"],
+                    "Server6":["sh1","sh3","sh4","sh5","sh6"],
+                    "Server7":["sh1","sh3","sh4","sh5","sh6"],
+                    "Server8":["sh2","sh3","sh4","sh5"],
+                    "Server9":["sh2","sh3","sh4","sh5"]}
+            }
+            res = rq.post("http://localhost:5000/init", json=init_payload)
+            if res.status_code != 200:
+                res.raise_for_status()
+
+            print("Init completed successfully")
+
+            start = perf_counter()
+            asyncio.run(rw_check(data))
+            stop = perf_counter()
+            print("Analysis completed in {0:5.2f} seconds\n".format(stop - start))
+        case _:
+            print("Invalid test no. Exiting...")
 
 if __name__ == '__main__':
     main()
