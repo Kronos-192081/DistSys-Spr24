@@ -56,7 +56,7 @@ def main():
             data = json.load(f)
             f.close()
             print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
-            print("This test is performed with 3 shard replicas.\n")
+            print("This test is performed with 3 shard replicas, 4 shards and 6 servers.\n")
             init_payload = {
                 "N":6,
                 "schema":{"columns":["Stud_id","Stud_name","Stud_marks"], "dtypes":["Number","String","String"]},
@@ -88,7 +88,7 @@ def main():
             data = json.load(f)
             f.close()
             print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
-            print("This test is performed with 3 shard replicas.\n")
+            print("This test is performed with 7 shard replicas, 4 shards and 7 servers.\n")
             init_payload = {
                 "N":7,
                 "schema":{"columns":["Stud_id","Stud_name","Stud_marks"], "dtypes":["Number","String","String"]},
@@ -121,7 +121,7 @@ def main():
             data = json.load(f)
             f.close()
             print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
-            print("This test is performed with 3 shard replicas.\n")
+            print("This test is performed with 8 shard replicas, 6 shards and 10 servers.\n")
             init_payload = {
                 "N":10,
                 "schema":{"columns":["Stud_id","Stud_name","Stud_marks"], "dtypes":["Number","String","String"]},
@@ -130,8 +130,8 @@ def main():
                     {"Stud_id_low":4096, "Shard_id": "sh2", "Shard_size":4096},
                     {"Stud_id_low":8192, "Shard_id": "sh3", "Shard_size":4096},
                     {"Stud_id_low":12288, "Shard_id": "sh4", "Shard_size":4096},
-                    {"Stud_id_low":16384, "Shard_id": "sh4", "Shard_size":4096},
-                    {"Stud_id_low":20480, "Shard_id": "sh4", "Shard_size":4096}],
+                    {"Stud_id_low":16384, "Shard_id": "sh5", "Shard_size":4096},
+                    {"Stud_id_low":20480, "Shard_id": "sh6", "Shard_size":4096}],
                 "servers":{
                     "Server0":["sh1","sh2","sh3","sh4","sh6"],
                     "Server1":["sh1","sh2","sh3","sh4","sh6"],
