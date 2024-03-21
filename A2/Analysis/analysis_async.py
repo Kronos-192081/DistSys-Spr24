@@ -2,7 +2,7 @@ import asyncio
 from time import perf_counter
 import json
 import requests as rq
-
+import sys
 import aiohttp
 
 async def req(s, d, op):
@@ -48,11 +48,12 @@ async def rw_check(data):
     print("\nRead Time: {0:5.2f} seconds\nRead Speed : {1:5.2f} reads per second\n".format(stop - start, len(data) / (stop - start)))
     
 def main():
-    print("Enter test no. :")
-    test_no = int(input())
+    if len(sys.argv) < 3:
+        print("Usage: python3 analysis_async.py [1/2/3]")
+    test_no = int(sys.argv[1])
     match test_no:
         case 1:
-            f = open("data.json", "r")
+            f = open("data0.json", "r")
             data = json.load(f)
             f.close()
             print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
@@ -84,10 +85,10 @@ def main():
             stop = perf_counter()
             print("Analysis completed in {0:5.2f} seconds\n".format(stop - start))
         case 2:
-            f = open("data.json", "r")
+            f = open("data0.json", "r")
             data = json.load(f)
             f.close()
-            print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
+            print("Test 2: Sending 10000 write requests followed by 10000 read requests...\n")
             print("This test is performed with 7 shard replicas, 4 shards and 7 servers.\n")
             init_payload = {
                 "N":7,
@@ -117,10 +118,10 @@ def main():
             stop = perf_counter()
             print("Analysis completed in {0:5.2f} seconds\n".format(stop - start))
         case 3:
-            f = open("data.json", "r")
+            f = open("data1.json", "r")
             data = json.load(f)
             f.close()
-            print("Test 1: Sending 10000 write requests followed by 10000 read requests...\n")
+            print("Test 3: Sending 10000 write requests followed by 10000 read requests...\n")
             print("This test is performed with 8 shard replicas, 6 shards and 10 servers.\n")
             init_payload = {
                 "N":10,
