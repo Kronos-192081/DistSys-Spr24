@@ -13,24 +13,44 @@ pip install requests aiohttp asyncio >/dev/null
 if [ "$test_type" = "1" ]; then
 	echo -e "\nRunning test 1"
 	python3 analysis_async.py 1
-
+	cd ..
+	make kill
+	make run
+	cd ./Analysis
+	sleep 2
 	echo -e "\nRunning test 2"
 	python3 analysis_async.py 2
-
+	cd ..
+	make kill
+	make run
+	cd ./Analysis
+	sleep 2
 	echo -e "\nRunning test 3"
 	python3 analysis_async.py 3
+	# cd ..
+	# make kill
 
 elif [ "$test_type" = "2" ]; then
 	echo -e "\nRunning test 1"
 	python3 analysis_sync.py 1
-
+	cd ..
+	make kill >/dev/null
+	make run >/dev/null
+	cd ./Analysis
+	sleep 2
 	echo -e "\nRunning test 2"
 	python3 analysis_sync.py 2
-
+	cd ..
+	make kill >/dev/null
+	make run >/dev/null
+	cd ./Analysis
+	sleep 2
 	echo -e "\nRunning test 3"
 	python3 analysis_sync.py 3
+	cd ..
+	make kill >/dev/null
 else
-    echo "Invalid input. Please enter 1 or 2."
+	echo "Invalid input. Please enter 1 or 2."
 fi
 
 deactivate

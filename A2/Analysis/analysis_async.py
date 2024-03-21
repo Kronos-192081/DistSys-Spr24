@@ -48,7 +48,7 @@ async def rw_check(data):
     print("\nRead Time: {0:5.2f} seconds\nRead Speed : {1:5.2f} reads per second\n".format(stop - start, len(data) / (stop - start)))
     
 def main():
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         print("Usage: python3 analysis_async.py [1/2/3]")
     test_no = int(sys.argv[1])
     match test_no:
