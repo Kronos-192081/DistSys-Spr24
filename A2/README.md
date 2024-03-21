@@ -248,3 +248,157 @@ ch.RemoveServer("server2")
 server := ch.GetServer(123)
 fmt.Println("Allocated Server:", server)
 ```
+
+# Load Balancer Implementation
+
+This README provides an overview of the load balancer implementation.
+
+## Environment Variables
+
+- **`DATABASE_URL`**: The URL for connecting to the database.
+- **`SERVER_IMAGE`**: The Docker image used for creating server containers.
+- **`NETWORK_MODE`**: The Docker network mode for communication between containers.
+- **`SERVER_SCHEMA`**: The schema used for the server configuration.
+- **`HASH_MODULO`**: The modulo value used for consistent hashing.
+
+## Initialization
+
+1. **Database Connection**: The load balancer establishes a connection to the specified database using the `DATABASE_URL` environment variable.
+   
+2. **Consistent Hashing Initialization**: The load balancer initializes a consistent hashing mechanism using the modulo value specified in the `HASH_MODULO` environment variable.
+   
+3. **Server Configuration**: The load balancer configures server instances using the Docker image specified in the `SERVER_IMAGE` environment variable and assigns them to the specified network mode (`NETWORK_MODE`).
+
+## Data Structures
+
+1. **Consistent Hashing Ring**: Utilized for distributing data across multiple server instances.
+   
+2. **Server List**: A map data structure to store the list of active server instances.
+
+## Load Balancer Logic
+
+- **`/rm` Endpoint (DELETE)**:
+  - Removes specified server containers based on payload data.
+  - Adjusts the number of servers to match the specified count.
+
+- **`/read` Endpoint (POST)**:
+  - Reads data from server containers based on the provided payload.
+  - Performs range parsing to obtain shard ID list.
+
+- **`/write` Endpoint (POST)**:
+  - Writes data to server containers based on the payload.
+  - Distributes data entries across appropriate server shards.
+  - Implements fault-tolerance handling for failed writes.
+
+- **Update Endpoint (PUT)**:
+  - Updates data on server containers based on payload.
+  - Implements fault-tolerance for partially successful updates.
+
+- **Del Endpoint (DELETE)**:
+  - Deletes data entries from server containers based on payload.
+  - Handles fault-tolerance for incomplete deletions.
+
+## Fault-Tolerance and Scalability
+
+- **Server Heartbeat**:
+  - Periodically checks the health of server instances.
+  - Handles server failures by removing and respawning containers.
+
+- **Add Server Container**:
+  - Dynamically adds new server containers based on demand.
+  - Configures the new server container with the specified schema and shard assignments.
+
+- **Kill Server Container**:
+  - Terminates existing server containers upon failure or removal.
+  - Updates consistent hashing and server list accordingly.
+
+## Utility Functions
+
+1. **Consistent Hashing Functions**:
+   - `hash_function()`: Computes the hash value for a given key using the specified modulo value.
+   - `get_shard_id()`: Determines the shard ID for a given key based on the consistent hashing mechanism.
+
+2. **Data Parsing Functions**:
+   - `parse_range()`: Parses the range of shard IDs from the payload data for read operations.
+
+3. **Fault-Tolerance Functions**:
+   - `handle_server_failure()`: Handles the failure of a server instance by removing it from the server list and redistributing its shards.
+   - `handle_partial_write()`: Implements fault-tolerance for partial writes by retrying failed writes on other server instances.
+
+## Docker API Functions
+
+1. **Container Management Functions**:
+   - `create_container()`: Creates a new Docker container based on the specified image and network mode.
+   - `remove_container()`: Removes the specified Docker container from the system.
+
+2. **Container Health Check Functions**:
+   - `check_container_health()`: Checks the health of a Docker container by sending a request to the container endpoint.
+   - `restart_container()`: Restarts a Docker container upon failure or unresponsiveness.
+
+## Other Handler Functions
+
+### Read Handler
+
+- **Endpoint**: `/read` (POST)
+- **Description**: Handles read operations by retrieving data from the appropriate server shards based on the shard ID list parsed from the payload.
+- **Functionality**:
+  1. Parses the payload to extract the list of shard IDs relevant to the read operation.
+  2. Sends read requests to the corresponding server instances based on the shard IDs.
+  3. Aggregates the responses from multiple servers and returns the combined result to the client.
+
+### Write Handler
+
+- **Endpoint**: `/write` (POST)
+- **Description**: Handles write operations by distributing data entries across the server shards using consistent hashing.
+- **Functionality**:
+  1. Computes the shard ID for the provided key using consistent hashing.
+  2. Sends write requests to the server instances responsible for the identified shard IDs.
+  3. Implements fault tolerance for partial writes by retrying failed writes on other server instances.
+
+### Update Handler
+
+- **Endpoint**: `/update` (PUT)
+- **Description**: Handles update operations by updating data entries on the server shards and implementing fault-tolerance for partially successful updates.
+- **Functionality**:
+  1. Retrieves the existing data associated with the provided key.
+  2. Updates the data value and sends update requests to the server instances responsible for the corresponding shard IDs.
+  3. Ensures fault tolerance by retrying failed updates on other server instances.
+
+### Delete Handler
+
+- **Endpoint**: `/delete` (DELETE)
+- **Description**: Handles delete operations by removing data entries from the server shards and ensuring fault-tolerance for incomplete deletions.
+- **Functionality**:
+  1. Sends delete requests to the server instances responsible for the shard IDs associated with the provided key.
+  2. Verifies the success of the delete operation and retries on other server instances if necessary to ensure fault tolerance.
+
+## Dockerfile Explaination
+
+This provides information about the Dockerfile used for building and deploying the load balancer.
+
+## Dockerfile Structure
+
+1. **Base Image**:
+   - `FROM golang:latest AS build`: Specifies the base image as the latest version of Golang.
+
+2. **Build Stage**:
+   - `WORKDIR /lb`: Sets the working directory inside the container to `/lb`.
+   - `COPY lb.go ./`: Copies the main Go file (`lb.go`) into the working directory.
+   - `COPY conhash ./conhash`: Copies the `conhash` directory containing consistent hashing library.
+   - `RUN go mod init distri-lb`: Initializes a Go module named `distri-lb`.
+   - `RUN go mod edit -replace prakhar/conhash=./conhash`: Replaces the standard `conhash` module with the local directory `./conhash`.
+   - `RUN go mod tidy && go mod download`: Cleans up and downloads module dependencies.
+   - `RUN CGO_ENABLED=0 GOOS=linux go build -o distri-lb`: Builds the executable binary named `distri-lb` with Linux OS target.
+
+3. **Deployment Stage**:
+   - `FROM postgres:latest AS deploy`: Sets the base image for deployment as the latest version of PostgreSQL.
+   - `COPY --from=build /lb/distri-lb ./`: Copies the compiled binary `distri-lb` from the build stage.
+   - `COPY init.sh /docker-entrypoint-initdb.d/`: Copies the initialization script to set up the database.
+
+4. **Environment Variables**:
+   - `POSTGRES_USER`: Specifies the username for PostgreSQL database (default: `postgres`).
+   - `POSTGRES_PASSWORD`: Specifies the password for PostgreSQL database (default: `20CS30061`).
+   - `POSTGRES_DB`: Specifies the name of the PostgreSQL database (default: `testdb`).
+
+5. **Exposed Port**:
+   - `EXPOSE 5000`: Exposes port 5000 for communication with the load balancer.
