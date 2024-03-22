@@ -30,6 +30,59 @@ Team Members:
 - Sourabh Soumyakanta Das (20CS30051)
 
 
+<!-- INSTALLATION -->
+# Getting Started
+## Requirements:
+- **OS**: Ubuntu 20.04 LTS or later
+- **Docker**: Version 20.10.23 or later
+
+## Installation
+<b>Note: </b> Use ``sudo`` if necessary
+
+### 1. **Clone the repository and navigate to the A2 directory.**
+```sh
+git clone https://github.com/Kronos-192081/DistSys-Spr24.git && cd A2
+```
+### 2. **Build the Docker images for the load balancer and servers.**
+```sh
+make build
+```
+This requires an active internet connection.
+
+### 3. **Start the load balancer system.**
+```sh
+make run
+```
+The load balancer shall now be listening on http://localhost:5000/, waiting for an `/init` request.
+
+### 4. **Interact with the load balancer.**
+
+One may use a browser, `curl` or any other HTTP client to first send the `/init` POST request with the appropriate JSON data, which would initialize the servers and their databases.
+
+Following this, the system is ready to receive requests at `/status`, `/add`, `/rm`, `/read`, `/write`, `/update`, and `/del`.
+
+### 5. **Perform testing and analysis.**
+<b>Note: </b> The system MUST be uninitialized before testing. Ensure this by executing `make kill` and `make run` first.
+
+One may execute a benchmark of 10,000 reads and writes via the script in the [Analysis](./Analysis/) folder by running this:
+
+```sh
+make test
+```
+Select the asynchronous/synchronous test with 1 or 2 respectively, and the tests shall be executed with their statistics recorded on the terminal screen. Sample results can be found at the end of this [README](#performance-analysis-of-distributed-database).
+
+### 6. **Shutdown and cleanup.**
+
+To stop the servers, load balancer and Docker network:
+
+```sh
+make kill
+```
+To remove the images:
+```sh
+make clean
+```
+
 # Server Implementation
 
 The server facilitates various operations related to a distributed database system, including configuration management, data manipulation, and interaction via HTTP endpoints.
