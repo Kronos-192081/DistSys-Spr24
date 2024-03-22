@@ -1698,16 +1698,3 @@ func killServerContainer(serverName string, shards []string) error {
 	time.Sleep(2 * time.Second)
 	return nil
 }
-
-/***
-
-TO-DO:
-
-1. Logical verification of code
-2. Error handling
-3. valid_idx update in /del ?
-4. /write, /update and /del fault-tolerance
-5. /heartbeat before every server access
-6. Testing
-
-***/
