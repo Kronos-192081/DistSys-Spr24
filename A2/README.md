@@ -176,6 +176,17 @@ This README provides an overview of the load balancer implementation.
 
 ## Load Balancer Logic
 
+- **`/init` Endpoint (POST)**:
+  - Initializes the load balancer and distributed database system.
+  - Sets up the required number of server containers and shards.
+
+- **`/status` Endpoint (GET)**:
+  - Retrieves the current status of the load balancer and distributed database system.
+  - Provides information such as active server containers, shard distribution, and system health.
+
+- **`/add` Endpoint (POST)**:
+  - Adds additional server containers to the system.
+  - Updates shard distribution and load balancing accordingly.
 - **`/rm` Endpoint (DELETE)**:
   - Removes specified server containers based on payload data.
   - Adjusts the number of servers to match the specified count.
@@ -189,11 +200,11 @@ This README provides an overview of the load balancer implementation.
   - Distributes data entries across appropriate server shards.
   - Implements fault-tolerance handling for failed writes.
 
-- **Update Endpoint (PUT)**:
+- **`/update` Endpoint (PUT)**:
   - Updates data on server containers based on payload.
   - Implements fault-tolerance for partially successful updates.
 
-- **Del Endpoint (DELETE)**:
+- **`/del` Endpoint (DELETE)**:
   - Deletes data entries from server containers based on payload.
   - Handles fault-tolerance for incomplete deletions.
 
