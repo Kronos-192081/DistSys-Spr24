@@ -21,7 +21,7 @@
 
 # About The Project
 
-This project is an implementation of a load balanced sharded database system in Go that utilizes consistent hashing. The problem statement can be viewed [here](./DS_assign1_LB_2024.pdf).
+This project is an implementation of a load balanced sharded database system in Go that utilizes consistent hashing. The problem statement can be viewed [here](./DS_assign2_DB.pdf).
 
 Team Members:
 - Kartik Pontula (20CS10031)
