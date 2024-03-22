@@ -1065,8 +1065,17 @@ func write(rw http.ResponseWriter, req *http.Request) {
 				}
 				servNameList = append(servNameList, servName)
 			}
+
+			for i, servName := range servNameList {
+				servNameList[i], err = serverHeartbeat(servName)
+				if err != nil {
+					fmt.Println("Error:", err)
+					rw.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			}
+
 			// fmt.Println(servNameList)
-			failed := false
 			curr_idx := -1
 			for _, servName := range servNameList {
 				// fmt.Println(shard, valid_idx_dict[shard], data_list)
@@ -1103,8 +1112,8 @@ func write(rw http.ResponseWriter, req *http.Request) {
 				}
 				if servResp.StatusCode != http.StatusOK {
 					fmt.Println("Error: Server failed")
-					failed = true
-					break
+					rw.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 
 				var writeServResp writeServResponse
@@ -1116,22 +1125,19 @@ func write(rw http.ResponseWriter, req *http.Request) {
 				}
 
 				if curr_idx != -1 && curr_idx != writeServResp.Curr_idx {
-					failed = true
-					break
+					rw.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 				curr_idx = writeServResp.Curr_idx
 			}
-			if !failed && curr_idx != -1 {
+			if curr_idx != -1 {
 				_, err = db.Exec("UPDATE ShardT SET valid_idx = $1 WHERE Shard_id = $2", curr_idx, shard)
 				if err != nil {
 					fmt.Println("Error:", err)
 					rw.WriteHeader(http.StatusInternalServerError)
 					return
 				}
-			} else {
-
 			}
-			//fault-tolerance handling - some shards write committed, some not, kill and respawn done servers
 		}
 
 		// Prepare and send JSON response
@@ -1209,7 +1215,15 @@ func update(rw http.ResponseWriter, req *http.Request) {
 			servNameList = append(servNameList, servName)
 		}
 
-		failed := false
+		for i, servName := range servNameList {
+			servNameList[i], err = serverHeartbeat(servName)
+			if err != nil {
+				fmt.Println("Error:", err)
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+
 		response := ""
 		for _, servName := range servNameList {
 			updateServData := updateServPayload{
@@ -1225,13 +1239,6 @@ func update(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			servName, err = serverHeartbeat(servName)
-			if err != nil {
-				fmt.Println("Error:", err)
-				rw.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
 			url := "http://" + servName + ":5000"
 			servResp, err := http.Post(url+"/update", "application/json", bytes.NewReader(jsonBody))
 			if err != nil {
@@ -1241,7 +1248,7 @@ func update(rw http.ResponseWriter, req *http.Request) {
 			}
 			if servResp.StatusCode != http.StatusOK {
 				fmt.Println("Error: Server failed")
-				failed = true
+				rw.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 
@@ -1254,16 +1261,11 @@ func update(rw http.ResponseWriter, req *http.Request) {
 			}
 
 			if response != "" && response != updateServResp.Message {
-				failed = true
-				break
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
 			}
 			response = updateServResp.Message
 		}
-
-		if failed {
-
-		}
-		//fault-tolerance handling - some shards update committed, some not, kill and respawn done servers
 
 		// Prepare and send JSON response
 		resp := Response{
@@ -1340,7 +1342,15 @@ func del(rw http.ResponseWriter, req *http.Request) {
 			servNameList = append(servNameList, servName)
 		}
 
-		failed := false
+		for i, servName := range servNameList {
+			servNameList[i], err = serverHeartbeat(servName)
+			if err != nil {
+				fmt.Println("Error:", err)
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+
 		response := ""
 		for _, servName := range servNameList {
 			delServData := delServPayload{
@@ -1349,13 +1359,6 @@ func del(rw http.ResponseWriter, req *http.Request) {
 			}
 
 			jsonBody, err := json.Marshal(delServData)
-			if err != nil {
-				fmt.Println("Error:", err)
-				rw.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			servName, err = serverHeartbeat(servName)
 			if err != nil {
 				fmt.Println("Error:", err)
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -1371,7 +1374,7 @@ func del(rw http.ResponseWriter, req *http.Request) {
 			}
 			if servResp.StatusCode != http.StatusOK {
 				fmt.Println("Error: Server failed")
-				failed = true
+				rw.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 
@@ -1384,16 +1387,11 @@ func del(rw http.ResponseWriter, req *http.Request) {
 			}
 
 			if response != "" && response != delServResp.Message {
-				failed = true
-				break
+				rw.WriteHeader(http.StatusInternalServerError)
+				return
 			}
 			response = delServResp.Message
 		}
-
-		if failed {
-
-		}
-		//fault-tolerance handling - some shards del committed, some not, kill and respawn done servers
 
 		// Prepare and send JSON response
 		resp := Response{
