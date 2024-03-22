@@ -42,8 +42,15 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Received config:", config) // debug
 
+	serverNo := os.Getenv("SERVER_NUMBER")
+	msgStr := ""
+	for i := 0; i < len(config.Shards)-1; i++ {
+		msgStr += "Server" + serverNo + ":" + config.Shards[i] + ", "
+	}
+	msgStr += "Server" + serverNo + ":" + config.Shards[len(config.Shards)-1] + " configured"
+
 	response := map[string]string{
-		"message": "Config received and processed successfully",
+		"message": msgStr,
 		"status":  "success",
 	}
 
@@ -135,9 +142,7 @@ func copyHandler(w http.ResponseWriter, r *http.Request) {
 		final_result[copyReq.Shards[i]] = result
 	}
 
-	response := map[string]interface{}{
-		"status": "success",
-	}
+	response := make(map[string][]Row)
 
 	for i := 0; i < len(copyReq.Shards); i++ {
 		response[copyReq.Shards[i]] = final_result[copyReq.Shards[i]]
@@ -260,10 +265,10 @@ func writeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := map[string]string{
-		"message":  "Data entries added",
-		"curr_idx": fmt.Sprintf("%d", writeReq.Curr_idx+len(writeReq.Data)),
-		"status":   "success",
+	response := writeServResponse{
+		Message:  "Data entries added",
+		Curr_idx: writeReq.Curr_idx + len(writeReq.Data),
+		Status:   "success",
 	}
 
 	jsonResponse, err := json.Marshal(response)
@@ -507,19 +512,20 @@ type deleteRequest struct {
 	Stud_id int    `json:"stud_id"`
 }
 
-func dbSetup(config dbConfig) bool {
-	var q1 string = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s INT PRIMARY KEY, %s VARCHAR(255), %s INT);", config.Shards[0], config.Schema.Columns[0], config.Schema.Columns[1], config.Schema.Columns[2])
-	var q2 string = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s INT PRIMARY KEY, %s VARCHAR(255), %s INT);", config.Shards[1], config.Schema.Columns[0], config.Schema.Columns[1], config.Schema.Columns[2])
-	_, err := db.Exec(q1)
-	if err != nil {
-		fmt.Println("Error creating table:", err)
-		return false
-	}
+type writeServResponse struct {
+	Message  string `json:"message"`
+	Curr_idx int    `json:"curr_idx"`
+	Status   string `json:"status"`
+}
 
-	_, _err := db.Exec(q2)
-	if _err != nil {
-		fmt.Println("Error creating table:", _err)
-		return false
+func dbSetup(config dbConfig) bool {
+	for i := 0; i < len(config.Shards); i++ {
+		var q string = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s INT PRIMARY KEY, %s VARCHAR(255), %s INT);", config.Shards[i], config.Schema.Columns[0], config.Schema.Columns[1], config.Schema.Columns[2])
+		_, err := db.Exec(q)
+		if err != nil {
+			fmt.Println("Error creating table:", err)
+			return false
+		}
 	}
 	return true
 }
