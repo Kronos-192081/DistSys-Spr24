@@ -148,107 +148,6 @@ The deploy stage (`FROM postgres:latest AS deploy`) defines the environment for 
 
 <b> Design Choice: </b>The Dockerfile employs a multi-stage build approach to optimize the image size and improve security. By using separate build and deploy stages, it ensures that only necessary dependencies are included in the final deployment image, resulting in a smaller footprint. The build stage utilizes the official Golang image to compile the server binary, while the deploy stage utilizes the official PostgreSQL image to set up the database environment. Additionally, the Dockerfile exposes port 5000 to allow external communication with the server. Overall, this design choice streamlines the Docker image creation process, enhances portability, and promotes consistency across different deployment environments.
 
-# Consistent Hashing Implementation
-
-## Overview
-
-- Consistent hashing is implemented in Go using a custom `ConHash` structure.
-- The implementation includes functionalities to add servers, remove servers, and allocate servers based on client IDs.
-- Implemented as a go module which can be imported.
-
-## Data Structures
-
-### 1. Node
-
-- Represents a node in the `ConHash` structure.
-- Has two attributes:
-  - `Occ` (Occupancy): Indicates whether the node is occupied or not.
-  - `Name`: Represents the name of the server.
-
-### 2. ConHash
-
-- Consistent hashing structure.
-- Attributes:
-  - `HashD`: Array of nodes representing the hash ring.
-  - `Size`: Size of the hash ring.
-  - `VirtServ`: Number of virtual servers per physical server.
-  - `Nserv`: Number of servers in the hash ring.
-  - `AllServers`: Map to track all server names.
-  - `ServerID`: Map to track server IDs.
-
-## Functional Endpoints
-
-### 1. Add Servers
-<b>Note: </b> Linear probing is used to resolve conflicts.
-- **Method:** `Add(ids []int, Names []string) int`
-  - Adds servers to the consistent hash ring.
-  - Takes an array of server IDs and corresponding names.
-  - Checks for name uniqueness.
-  - Checks if the size limit is exceeded.
-  - Returns 1 on success, 0 on failure.
-
-### 2. Get Configuration (For debugging purposes)
-
-- **Method:** `GetConfig()`
-  - Prints the configuration of the consistent hash ring.
-  - Displays index, status, and server information.
-
-### 3. Add Single Server
-
-- **Method:** `AddServer(id int, Name string) int`
-  - Adds a single server to the consistent hash ring.
-  - Checks for name uniqueness.
-  - Checks if the size limit is exceeded.
-  - Returns 1 on success, 0 on failure.
-
-### 4. Remove Server
-<b> Time Complexity:</b>  &nbsp; $\mathcal{O(K)}$ time complexity, where $\mathcal{K}$ is the number of virtual servers. 
-- **Method:** `RemoveServer(Name string) int`
-  - Removes a server from the consistent hash ring.
-  - Returns 1 on success, 0 on failure.
-
-### 5. Get Server Allocation
-
-- **Method:** `GetServer(id int) string`
-  - Returns the server for the given client ID.
-  - Handles the case of no allocable server.
-  - Prints the hash for the given client ID.
-
-## Usage
-
-- Initialize a new `ConHash` instance using `NewConHash(m, k)` with the desired size and virtual servers.
-- Use the provided methods to interact with the consistent hash ring.
-
-## Example
-
-```go
-package main
-
-import (
-    "fmt"
-    "prakhar/conhash"
-)
-
-// Create a new ConHash instance
-ch := conhash.NewConHash(100, 3)
-
-// Add servers to the hash ring
-ch.Add([]int{1, 2, 3}, []string{"server1", "server2", "server3"})
-
-// Get and print the configuration
-ch.GetConfig()
-
-// Add a single server
-ch.AddServer(4, "server4")
-
-// Remove a server
-ch.RemoveServer("server2")
-
-// Get server allocation for a client ID
-server := ch.GetServer(123)
-fmt.Println("Allocated Server:", server)
-```
-
 # Load Balancer Implementation
 
 This README provides an overview of the load balancer implementation.
@@ -318,22 +217,11 @@ This README provides an overview of the load balancer implementation.
    - `hash_function()`: Computes the hash value for a given key using the specified modulo value.
    - `get_shard_id()`: Determines the shard ID for a given key based on the consistent hashing mechanism.
 
-2. **Data Parsing Functions**:
-   - `parse_range()`: Parses the range of shard IDs from the payload data for read operations.
-
-3. **Fault-Tolerance Functions**:
-   - `handle_server_failure()`: Handles the failure of a server instance by removing it from the server list and redistributing its shards.
-   - `handle_partial_write()`: Implements fault-tolerance for partial writes by retrying failed writes on other server instances.
-
 ## Docker API Functions
 
 1. **Container Management Functions**:
    - `create_container()`: Creates a new Docker container based on the specified image and network mode.
    - `remove_container()`: Removes the specified Docker container from the system.
-
-2. **Container Health Check Functions**:
-   - `check_container_health()`: Checks the health of a Docker container by sending a request to the container endpoint.
-   - `restart_container()`: Restarts a Docker container upon failure or unresponsiveness.
 
 ## Other Handler Functions
 
@@ -402,3 +290,74 @@ This provides information about the Dockerfile used for building and deploying t
 
 5. **Exposed Port**:
    - `EXPOSE 5000`: Exposes port 5000 for communication with the load balancer.
+
+# Performance Analysis of Distributed Database
+
+This performance analysis provides a detailed overview of the efficiency of the developed distributed database across multiple test scenarios, focusing on various configurations and their impact on write and read operations.
+
+## Test Results
+
+### Test 1: 
+- **Configuration**:
+  - Shard Replicas: 3
+  - Shards: 4
+  - Servers: 6
+- **Init Time**: Completed successfully
+- **Write Time**: 18.27 seconds
+- **Write Speed**: 547.42 writes per second
+- **Read Time**: 7.06 seconds
+- **Read Speed**: 1416.94 reads per second
+- **Analysis Time**: 25.33 seconds
+
+### Test 2: 
+- **Configuration**:
+  - Shard Replicas: 7
+  - Shards: 4
+  - Servers: 7
+- **Init Time**: Completed successfully
+- **Write Time**: 35.67 seconds
+- **Write Speed**: 280.36 writes per second
+- **Read Time**: 6.83 seconds
+- **Read Speed**: 1463.36 reads per second
+- **Analysis Time**: 42.50 seconds
+
+### Test 3: 
+- **Configuration**:
+  - Shard Replicas: 8
+  - Shards: 6
+  - Servers: 10
+- **Init Time**: Completed successfully
+- **Write Time**: 32.18 seconds
+- **Write Speed**: 310.78 writes per second
+- **Read Time**: 6.67 seconds
+- **Read Speed**: 1498.75 reads per second
+- **Analysis Time**: 38.85 seconds
+
+### Test 4:
+
+- All endpoints of the load balancer and distributed database system were found to be functioning correctly during testing.
+- The fault tolerance mechanism of the system was successfully verified, with the load balancer seamlessly handling the failure of a server container by spawning a new container and copying shard entries from other replicas.
+
+The manual testing and fault tolerance verification confirmed the robustness and reliability of the load balancer and distributed database system under normal and failure conditions.
+
+
+## Detailed Analysis
+
+### Write Operations:
+- The write time varies across different configurations, ranging from 18.27 seconds to 35.67 seconds. 
+- Test 1, with fewer shard replicas and servers, demonstrates higher write speeds compared to Test 2 and Test 3.
+- As the number of shard replicas increases in Test 2 and Test 3, the write speed decreases due to increased synchronization overhead.
+
+### Read Operations:
+- Read times across all tests are relatively consistent, with Test 3 exhibiting the lowest read time of 6.67 seconds.
+- Test 1 shows a slightly higher read time compared to Test 2 and Test 3, potentially due to fewer servers distributing the read load.
+
+### Impact of Configuration:
+- The choice of shard replicas, shards, and servers significantly influences the overall performance of the distributed database.
+- Increasing the number of servers can potentially improve parallelism and distribution, leading to higher performance in terms of both write and read operations.
+- However, an increase in shard replicas may introduce additional synchronization overhead, impacting overall performance.
+
+## Conclusion
+
+The performance analysis highlights the importance of carefully selecting the configuration parameters for a distributed database system. While higher replication and sharding can enhance fault tolerance and scalability, they also introduce overhead that can affect performance. Overall, understanding the trade-offs and optimizing the configuration based on specific use cases is essential for achieving optimal performance in a distributed database environment.
+
