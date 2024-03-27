@@ -250,6 +250,19 @@ func main() {
 		delSrv.ListenAndServe()
 	}()
 
+	// Heartbeat goroutine
+	go func() {
+		for {
+			time.Sleep(5 * time.Second)
+			for server, isActive := range ServerList {
+				if isActive {
+					println("heartbeat ", server)
+					serverHeartbeat(server)
+				}
+			}
+		}
+	}()
+
 	// Defer shutdown of servers
 	defer func() {
 		// Graceful shutdown of servers
